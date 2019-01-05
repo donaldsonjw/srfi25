@@ -3,7 +3,7 @@ BIGLOO = bigloo
 BGLAFILE = bglafile
 BGLJFILE = bgljfile
 BGLTAGS = bgltags
-LD = ld
+LD = gcc --shared
 AR = ar
 JAR = jar
 RANLIB = ranlib
@@ -188,24 +188,24 @@ jar_eu : $(UCLASSDIR) $(DISTDIR) $(EUNSAFECLASSES)
 
 
 $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).so: $(OBJDIR) $(DISTDIR) $(SAFEOBJECTS)
-	$(LD) -G -o $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).so $(SAFEOBJECTS) -lc -lm
+	$(LD)  -o $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).so $(SAFEOBJECTS) -lc -lm
 
 $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).a : $(OBJDIR) $(DISTDIR) $(SAFEOBJECTS)
 	$(AR) qcv $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).a $(SAFEOBJECTS);\
 	$(RANLIB) $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).a
 
 $(DISTDIR)/lib$(LIBNAME)_es-$(VERSION).so : $(OBJDIR) $(DISTDIR) $(ESAFEOBJECTS)
-	$(LD) -G -o $(DISTDIR)/lib$(LIBNAME)_es-$(VERSION).so $(ESAFEOBJECTS) -lc -lm
+	$(LD)  -o $(DISTDIR)/lib$(LIBNAME)_es-$(VERSION).so $(ESAFEOBJECTS) -lc -lm
 
 $(DISTDIR)/lib$(LIBNAME)_u-$(VERSION).so : $(OBJDIR) $(DISTDIR) $(UNSAFEOBJECTS)
-	$(LD) -G -o $(DISTDIR)/lib$(LIBNAME)_u-$(VERSION).so $(UNSAFEOBJECTS) -lc -lm
+	$(LD)  -o $(DISTDIR)/lib$(LIBNAME)_u-$(VERSION).so $(UNSAFEOBJECTS) -lc -lm
 
 $(DISTDIR)/lib$(LIBNAME)_u-$(VERSION).a : $(OBJDIR) $(DISTDIR) $(UNSAFEOBJECTS)
 	$(AR) qcv $(DISTDIR)/lib$(LIBNAME)_u-$(VERSION).a $(SAFEOBJECTS);\
 	$(RANLIB) $(DISTDIR)/lib$(LIBNAME)_u-$(VERSION).a
 
 $(DISTDIR)/lib$(LIBNAME)_eu-$(VERSION).so : $(OBJDIR) $(DISTDIR) $(EUNSAFEOBJECTS)
-	$(LD) -G -o $(DISTDIR)/lib$(LIBNAME)_eu-$(VERSION).so $(EUNSAFEOBJECTS) -lc -lm
+	$(LD)  -o $(DISTDIR)/lib$(LIBNAME)_eu-$(VERSION).so $(EUNSAFEOBJECTS) -lc -lm
 
 
 recette/test$(LIBNAME) : $(TESTOBJECTS) lib 
