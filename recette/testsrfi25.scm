@@ -106,13 +106,13 @@
       (assert= (array-end (array (shape 1 2 3 4 5 6 7 8) *) 3) 8))
 
    (test "array-ref of make-array works"
-      (assert-exception-thrown (array-ref (make-array (shape) 'a)) &error)
+      (assert-eq? (array-ref (make-array (shape) 'a)) 'a)
       (assert-eq? (array-ref (make-array (shape -1 1) 'b) -1) 'b)
       (assert-eq? (array-ref (make-array (shape -1 1) 'c) 0) 'c)
       (assert-eq? (array-ref (make-array (shape 1 2 3 4 5 6 7 8) 'd) 1 3 5 7) 'd))
 
    (test "array-ref of make-array using vector indicies works"
-      (assert-exception-thrown (array-ref (make-array (shape) 'a) '#()) &error)
+      (assert-eq? (array-ref (make-array (shape) 'a) '#()) 'a)
       (assert-eq? (array-ref (make-array (shape -1 1) 'b) '#(-1)) 'b)
       (assert-eq? (array-ref (make-array (shape -1 1) 'c) '#(0)) 'c)
       (assert-eq? (array-ref (make-array (shape 1 2 3 4 5 6 7 8) 'd)
@@ -121,9 +121,8 @@
     
    (test "array-ref of make-array using array indices works"
 
-      (assert-exception-thrown (array-ref (make-array (shape) 'a)
-                                  (array (shape 0 0)))
-         &error)
+      (assert-eq? (array-ref (make-array (shape) 'a)
+                     (array (shape 0 0))) 'a)
       (assert-eq? (array-ref (make-array (shape -1 1) 'b)
                      (array (shape 0 1) -1))
          'b)
@@ -136,7 +135,8 @@
 
    (test "array-set! of make-array with arguments works"
       (let ((arr (make-array (shape) 'o)))
-         (assert-exception-thrown (array-set! arr 'a) &error))
+         (array-set! arr 'a)
+         (assert-eq? (array-ref arr) 'a))
       (let ((arr (make-array (shape -1 1) 'o)))
          (array-set! arr -1 'b)
          (array-set! arr 0 'c)
@@ -148,7 +148,8 @@
 
    (test "array-set! of make-array with vector works"
       (let ((arr (make-array (shape) 'o)))
-         (assert-exception-thrown (array-set! arr '#() 'a) &error))
+         (array-set! arr '#() 'a)
+         (assert-eq? (array-ref arr '#()) 'a))
       (let ((arr (make-array (shape -1 1) 'o)))
          (array-set! arr '#(-1) 'b)
          (array-set! arr '#(0) 'c)
@@ -160,7 +161,8 @@
 
    (test "array-set! of make-array with array works"
       (let ((arr (make-array (shape) 'o)))
-         (assert-exception-thrown (array-set! arr 'a) &error))
+         (array-set! arr 'a)
+         (assert-eq? (array-ref arr) 'a))
       (let ((arr (make-array (shape -1 1) 'o)))
          (array-set! arr (array (shape 0 1) -1) 'b)
          (array-set! arr (array (shape 0 1) 0) 'c)
@@ -168,7 +170,8 @@
          (assert-eq? (array-ref arr 0) 'c))
       (let ((arr (make-array (shape 1 2 3 4 5 6 7 8) 'o)))
          (array-set! arr (array (shape 0 4) 1 3 5 7) 'd)
-         (assert-eq? (array-ref arr 1 3 5 7) 'd)))
+         (assert-eq? (array-ref arr 1 3 5 7) 'd))
+      )
    
    (test "array sharing with changes works"
       (let* ((org (array (shape 6 9 0 2) 'a 'b 'c 'd 'e 'f))

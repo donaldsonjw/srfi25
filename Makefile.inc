@@ -25,7 +25,7 @@ INSTBIGLOOLIBDIR = $(INSTLIBDIR)/bigloo/$(BIGLOO_VERSION)
 BHEAPFLAGS = -I src/Llib -unsafe -q -mkaddheap -mkaddlib \
 	     -heap-library $(LIBNAME)
 
-BCOMMONFLAGS = -mkaddlib -fsharing -q \
+BCOMMONFLAGS = -fisa -mkaddlib -fsharing -q \
                -copt '$(CCOMMONFLAGS)' -I src/Llib
 
 BSAFEFLAGS = $(BCOMMONFLAGS) -O6 

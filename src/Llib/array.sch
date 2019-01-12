@@ -2,7 +2,7 @@
    (lambda (x e)
       (match-case x
          ((?- ?array)
-          `(array-ref ,@(e `(,array) e)))
+          `(array-ref0 ,@(e `(,array) e)))
          ((?- ?array ?i1)
           (e `(array-ref1 ,array ,i1) e))
          ((?- ?array ?i1 ?i2)
@@ -18,7 +18,7 @@
    (lambda (x e)
       (match-case x
          ((?- ?array ?v)
-          `(array-set! ,@(e `(,array ,v) e)))
+          `(array-set0! ,@(e `(,array ,v) e)))
          ((?- ?array ?i1 ?v)
           (e `(array-set1! ,array ,i1 ,v) e))
          ((?- ?array ?i1 ?i2 ?v)

@@ -7,42 +7,37 @@
          index::procedure
          shape::%shape
          vec::vector)
+
+      (inline array? obj)
+      (make-array shape::%shape #!optional (default #unspecified))
+      (array shape::%shape #!rest vals)
+      (array-length array::%array dim)
+      (array-size array::%array)
+      (array-equal? arr1 arr2)
+      (array-rank array::%array)
+      (array-start array::%array k)
+      (array-end array::%array k)
+      (array-shape array::%array)
+      (array-ref array::%array #!rest indices)
+      (array-set! array::%array #!rest indices+val)
+      (share-array array::%array shape::%shape proc::procedure)
+      (array-ref2 array::%array i1 i2)
+      (array-set2! array::%array i1 i2 val)
+      (array-ref1 array::%array i1)
+      (array-set1! array::%array i1 val)
+      (array-set0! array::%array val)
+      (array-ref0 array::%array)
+
       (shape::%shape #!rest bounds)
       (inline shape? obj)
       (inline shape-rank shape::%shape)
       (inline shape-start shape::%shape dim)
       (inline shape-end shape::%shape dim)
       (inline shape-copy shape::%shape)
-      
-      (inline array? obj)
-      (make-array shape::%shape #!optional (default #unspecified))
-      (array shape::%shape #!rest vals)
-      (generic array-length array::%array-base dim)
-      (generic array-size array::%array-base)
-      (array-equal? arr1 arr2)
-      (generic array-rank array::%array-base)
-      (generic array-start array::%array-base k)
-      (generic array-end array::%array-base k)
-      (generic array-shape array::%array-base)
-      (generic array-ref array::%array-base #!rest indices)
-      (generic array-set! array::%array-base #!rest indices+val)
-      (generic share-array array::%array-base shape::%shape proc::procedure)
       (inline shape-bounded? shape::%shape dim v)
-      (generic array-ref2 array::%array-base i1 i2)
-      (generic array-set2! array::%array-base i1 i2 val)
-      (generic array-ref1 array::%array-base i1)
-      (generic array-set1! array::%array-base i1 val)))
-
-;;;; array protocol
-(define-generic (array-length array::%array-base dim))
-(define-generic (array-size array::%array-base))
-(define-generic (array-rank array::%array-base))
-(define-generic (array-start array::%array-base k))
-(define-generic (array-end array::%array-base k))
-(define-generic (array-shape array::%array-base))
-(define-generic (array-ref array::%array-base #!rest indices))
-(define-generic (array-set! array::%array-base #!rest indices+val))
-(define-generic (share-array array::%array-base shape::%shape proc::procedure))
+      
+      
+      ))
 
 (define (pairwise-non-decreasing? lst)
    (let ((len (length lst)))
@@ -131,7 +126,10 @@
 
 (define (shape->index-procedure shape::%shape)
    (let ((rank (shape-rank shape)))
-      (cond ((=fx rank 1)
+      (cond ((=fx rank 0)
+             (lambda (#!optional val)
+                (values 0 val)))
+            ((=fx rank 1)
              (let ((lower (shape-start shape 0)))
                 (lambda (index #!optional val)
                    (if (shape-bounded? shape 0 index)
@@ -179,11 +177,11 @@
 (define-inline (array? obj)
    (isa? obj %array-base))
 
-(define-method (array-length array::%array dim)
+(define (array-length array::%array dim)
    (-fx (array-end array dim)
       (array-start array dim)))
 
-(define-method (array-size array::%array)
+(define (array-size array::%array)
    (do ((i 0 (+fx i 1))
         (size 1 (*fx size (array-length array i))))
        ((=fx i (array-rank array)) size)))
@@ -211,16 +209,16 @@
        (error "array" "provided values and shape are not compatible"
           (cons shape vals))))
 
-(define-method (array-shape array::%array)
+(define (array-shape array::%array)
    (shape-copy (-> array shape)))
 
-(define-method (array-rank array::%array)
+(define (array-rank array::%array)
    (vector-length (-> array shape vec)))
 
-(define-method (array-start array::%array k)
+(define (array-start array::%array k)
    (car (vector-ref (-> array shape vec) k)))
 
-(define-method (array-end array::%array k)
+(define (array-end array::%array k)
    (cdr (vector-ref (-> array shape vec) k)))
 
 (define (vector-or-rank-1-array? x)
@@ -239,19 +237,20 @@
          (else
           (error "vector/rank-1-array->list" "unsupported type" x))))
 
-(define-generic (array-ref1 array::%array-base i1))
-(define-method (array-ref1 array::%array i1)
+(define (array-ref0 array::%array)
+   (vector-ref (-> array vec) 0))
+
+(define (array-ref1 array::%array i1)
    (if (vector-or-rank-1-array? i1)
        (array-ref array i1)
        (vector-ref (-> array vec)
           ((-> array index) i1))))
 
-(define-generic (array-ref2 array::%array-base i1 i2))
-(define-method (array-ref2 array::%array i1 i2)
+(define (array-ref2 array::%array i1 i2)
    (vector-ref (-> array vec)
       ((-> array index) i1 i2)))
 
-(define-method (array-ref array::%array #!rest indices)
+(define (array-ref array::%array #!rest indices)
    (let ((array::%array array)
          (len (length indices)))
       (cond  ((and (=fx len 1)
@@ -260,24 +259,27 @@
                  (apply (-> array index)
                     (vector/rank-1-array->list (car indices)))))
              ((>fx len 0)
-              (vector-ref (-> array vec)vector-or-rank-1-array?
+              (vector-ref (-> array vec)
                  (apply (-> array index) indices)))
+             ((=fx len 0)
+              (vector-ref (-> array vec) 0))
              (else
               (error "array-ref" "invalid indices: "  indices)))))
 
-(define-generic (array-set1! array::%array-base i1 val))
-(define-method (array-set1! array::%array i1 val)
+(define (array-set0! array::%array val)
+   (vector-set! (-> array vec) 0 val))
+
+(define (array-set1! array::%array i1 val)
    (if (vector-or-rank-1-array? i1)
        (array-set! array i1 val)
        (vector-set! (-> array vec)
           ((-> array index) i1) val)))
 
-(define-generic (array-set2! array::%array-base i1 i2 val))
-(define-method (array-set2! array::%array i1 i2 val)
+(define (array-set2! array::%array i1 i2 val)
    (vector-set! (-> array vec)
       ((-> array index) i1 i2) val))
 
-(define-method (array-set! array::%array #!rest indices+val)
+(define (array-set! array::%array #!rest indices+val)
    (let ((array::%array array)
          (len (length indices+val)))
       (cond ((and (=fx len 2)
@@ -295,10 +297,12 @@
                     (apply (-> array index) indices+val))
                  (lambda (index val)
                     (vector-set! (-> array vec) index val))))
+             ((=fx len 1)
+              (vector-set! (-> array vec) 0 (car indices+val)))
              (else
               (error "array-set!" "invalid arguments" indices+val)))))
 
-(define-method (share-array array::%array shape::%shape proc::procedure)
+(define (share-array array::%array shape::%shape proc::procedure)
    (let ((copy::%shape (shape-copy shape)))
       (instantiate::%array (shape copy)
                            (index (lambda indices+val
@@ -326,10 +330,10 @@
             (equal? (-> shap1 vec)
                (-> shap2 vec))))))
 
-(define-method (object-equal? arr1::%array-base obj)
+(define-method (object-equal? arr1::%array obj)
    (if (not (array? obj))
        #f
-       (let ((arr2::%array-base obj))
+       (let ((arr2::%array obj))
           (and (equal?  (array-shape arr1) (array-shape arr2))
                (let* ((r (array-rank arr1))
                       (ks (make-vector r 0)))
