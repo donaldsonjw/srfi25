@@ -2,6 +2,215 @@
    (library srfi25 btest)
    (main main))
 
+
+(define i_4 (let* ((i (make-array
+                         (shape 0 4 0 4)
+                         0))
+                   (d (share-array i
+                         (shape 0 4)
+                         (lambda (k)
+                            (values k k)))))
+               (do   ((k 0 (+ k 1))) ((= k 4))
+                     (array-set! d k 1))
+               i))
+
+(define threed123
+  (array (shape 0 1 0 2 0 3)
+         'a 'b 'c
+         'd 'e 'f))
+
+(define threed312
+  (array (shape 0 3 0 1 0 2)
+         'a 'd
+         'b 'e
+         'c 'f))
+
+(define rot231 (list 1 2 0))
+
+
+
+;;; The frivolous board game exercises share of share of share.
+
+;;; A three dimensional chess board with two phases: piece and colour
+;;; of piece. Think of pieces in a cube with height, width and depth,
+;;; and piece colours in a parallel cube. We put pink jays around and
+;;; grey crows inside the board proper. Later we put in a blue rook.
+
+(define board
+  (tabulate-array
+   (shape -1 9 -1 9 -1 9 0 2)
+   (lambda (t u v w)
+     (case w
+       ((0) (if (and (< -1 u 8)
+                     (< -1 v 8)
+                     (< -1 t 8))
+                'crow
+                'jay))
+       ((1) (if (and (< -1 u 8)
+                     (< -1 v 8)
+                     (< -1 t 8))
+                'grey
+                'pink))))))
+
+;;; A cylinder with height 4, width 4, depth 6, both phases, centered
+;;; inside the board. Top left front corner is at 0 0 0 of cylinder but
+;;; 2 2 1 of board.
+
+(define board-cylinder
+  (share-array
+   board
+   (shape 0 4 0 4 0 6 0 2)
+   (lambda (t u v w)
+     (values (+ t 2) (+ u 2) (+ v 1) w))))
+
+
+;;; The center cube with side 2 of the cylinder, hence of the board,
+;;; with both phases. Top left corner is 0 0 0 of center but 1 1 2
+;;; of cylinder and 3 3 3 of board.
+
+(define board-center
+  (share-array
+   board-cylinder
+   (shape 0 2 0 2 0 2 0 2)
+   (lambda (t u v w)
+     (values (+ t 1) (+ u 1) (+ v 2) w))))
+
+
+;;; Front face of center cube, in two dimensions plus phase. Top left
+;;; corner is 0 0 of face but 0 0 0 of center and 1 1 2 of cylinder
+;;; 3 3 3 of board.
+
+(define board-face
+  (share-array
+   board-center
+   (shape 0 2 0 2 0 2)
+   (lambda (t u w)
+     (values t u 0 w))))
+
+
+;;; Left side of face in three dimensions plus phase. Top is 0 0 0 of
+;;; pillar but 0 0 of face and 0 0 0 of center and 1 1 2 of cylinder
+;;; and 3 3 3 of board. Bottom is 1 0 0 of pillar but 1 0 of face and
+;;; 1 0 0 of center and 2 1 2 of cylinder and 4 3 3 of board.
+
+(define board-pillar
+  (share-array
+   board-face
+   (shape 0 2 0 1 0 1 0 2)
+   (lambda (t u v w)
+     (values t 0 w))))
+
+
+;;; Pillar upside down. Now top 0 0 0 is 1 0 of face and 1 0 0 of center
+;;; and 2 1 2 of cylinder and 4 3 3 of board.
+
+(define board-reverse-pillar
+  (share-array
+   board-pillar
+   (shape 0 2 0 1 0 1 0 2)
+   (lambda (t u v w)
+     (values (- 1 t) u v w))))
+
+
+;;; Bottom of pillar.
+
+(define board-cubicle
+  (share-array
+   board-pillar
+   (shape 0 2)
+   (lambda (w)
+     (values 1 0 0 w))))
+
+
+;;; Top of upside down pair.
+
+(define board-reverse-cubicle
+  (share-array
+   board-reverse-pillar
+   (shape 0 2)
+   (lambda (w)
+     (values 0 0 0 w))))
+
+
+;;; Piece phase of cubicle.
+
+(define board-piece
+  (share-array
+   board-cubicle
+   (shape)
+   (lambda ()
+     (values 0))))
+
+
+;;; Colour phase of the other cubicle that is actually the same cubicle.
+
+(define board-colour
+  (share-array
+   board-reverse-cubicle
+   (shape)
+   (lambda ()
+     (values 1))))
+
+
+;;; Put a blue rook at the bottom of the pillar and at the top of the
+;;; upside pillar.
+
+(array-set! board-piece 'rook)
+(array-set! board-colour 'blue)
+
+
+;;; Build the same chess position directly.
+
+(define board-two
+  (tabulate-array
+   (shape -1 9 -1 9 -1 9 0 2)
+   (lambda (t u v w)
+     (if (and (= t 4) (= u 3) (= v 3))
+         (case w
+           ((0) 'rook)
+           ((1) 'blue))
+         (case w
+           ((0) (if (and (< -1 u 8)
+                         (< -1 v 8)
+                         (< -1 t 8))
+                    'crow
+                    'jay))
+           ((1) (if (and (< -1 u 8)
+                         (< -1 v 8)
+                         (< -1 t 8))
+                    'grey
+                    'pink)))))))
+
+;;; Permute the dimensions of the chess board in two different ways.
+;;; The transpose also exercises matrix multiplication.
+
+(define board-three
+  (share-array
+   board-two
+   (shape 0 2 -1 9 -1 9 -1 9)
+   (lambda (w t u v)
+      (values t u v w))))
+
+
+;; Just see that empty share does not crash. No index is valid. Just by
+;;; the way. There is nothing to be done with it.
+
+(define board-nothing
+  (share-array
+   board
+   (shape 0 3 1 1 0 3)
+   (lambda (t u v)
+     (values 0 0 0))))
+
+;;; Multiplication table
+
+(define four-by-four
+  (array (shape 0 4 0 4)
+         0 0 0 0
+         0 1 2 3
+         0 2 4 6
+         0 3 6 9))
+
 (define-test-suite srfi25-tests
    
    (test "shape works"
@@ -297,9 +506,185 @@
             (assert-eq? (array-ref arr 5 6) 'lr)
             (array-set! arr wor1 'xx)
             (assert-eq? (array-ref arr 4 5) 'xx))))
+
+;;;; arlib tests
+
+   (test "i_4 vs tabulate-array"
+      (assert-true (array-equal? i_4
+                      (tabulate-array
+                         (shape 0 4 0 4)
+                         (lambda (j k)
+                            (if (= j k) 1 0))))))
+   (test "i_4 vs array"
+      (assert-true (array-equal? i_4
+                      (array
+                         (shape 0 4 0 4)
+                         1 0 0 0
+                         0 1 0 0 
+                         0 0 1 0
+                         0 0 0 1))))
+   (test "i_4 diagonal"
+      (assert-true (array-equal? (share-array
+                                    i_4
+                                    (shape 0 4)
+                                    (lambda (k)
+                                       (values k k)))
+                      (share-array
+                         (array (shape) 1)
+                         (shape 0 4)
+                         (lambda (k)
+                            (values))))))
+
+   (test "i_4 codiagonal"
+      (assert-true (array-equal? (share-array
+                                    i_4
+                                    (shape 0 4)
+                                    (lambda (k)
+                                       (values (- 3 k) k)))
+                      (share-array
+                         (array (shape) 0)
+                         (shape 0 4)
+                         (lambda (k)
+                            (values))))))
+   (test "i_4 corners and center"
+      (assert-true (array-equal? (share-array
+                                    i_4
+                                    (shape 0 2 0 2)
+                                    (lambda (j k)
+                                       (values (* 3 j) (* 3 k))))
+                      (share-array
+                         i_4
+                         (shape 0 2 0 2)
+                         (lambda (j k)
+                            (values (+ j 1) (+ k 1)))))))
+
+   ; (test "i_4 transpose"
+   ;    (assert-true (array-equal? i_4 (transpose i_4))))
+
+   ; (test "threed123 transpose"
+   ;    (assert-true  (array-equal? threed123
+   ;                     (apply transpose threed312 rot231))))
+
+   (test "board vs board-two"
+      (assert-true (array-equal? board board-two)))
+
+   ; (test "board-three vs transpose of board-two"
+   ;    (assert-true (array-equal? board-three
+   ;                (transpose board-two 3 0 1 2))))
+
+   ; (test "board-two versus transpose of board-two"
+   ;    (assert-true (array-equal? (share-array
+   ;                      board-two
+   ;                      (shape -1 9 0 2 -1 9 -1 9)
+   ;                      (lambda (t w u v)
+   ;                         (values t u v w)))
+   ;                    (transpose board-two 0 3 1 2))))
+
+   (test "board-nothing"
+      (assert-true (array-equal? board-nothing (array (array-shape board-nothing)))))
+
+   (test "tabulate-array! with vector"
+      (assert-true
+         (array-equal? (tabulate-array (shape 4 8 2 5 0 1) *)
+            (tabulate-array! (shape 4 8 2 5 0 1)
+               (lambda (v)
+                  (* (vector-ref v 0)
+                     (vector-ref v 1)
+                     (vector-ref v 2)))
+               (vector * * *)))))
+
+   (test "tabulate-array! with array"
+      (assert-true (array-equal? (tabulate-array (shape 4 8 2 5 0 1) *)
+                      (let ((index (share-array (make-array (shape 0 2 0 3))
+                                      (shape 0 3)
+                                      (lambda (k) (values 1 k)))))
+                         (tabulate-array! (shape 4 8 2 5 0 1)
+                            (lambda (a)
+                               (* (array-ref a 0)
+                                  (array-ref a 1)
+                                  (array-ref a 2)))
+                            index))))
+      )
+   (test "array-sum"
+      (assert-true (array-equal?
+                      (array-map
+                         +
+                         (share-array (array (shape) 0) (shape 1 2 1 4) (lambda _ (values)))
+                         (share-array (array (shape) 1) (shape 1 2 1 4) (lambda _ (values)))
+                         (share-array (array (shape) 2) (shape 1 2 1 4) (lambda _ (values))))
+                      (array (shape 1 2 1 4) 3 3 3))))
+
+   (test "four-by-four vs tabulate-array"
+      (assert-true (array-equal? four-by-four (tabulate-array (shape 0 4 0 4) *))))
+
+   (test "four-by-four vs array-retabulate!"
+      (assert-true (array-equal?
+                      four-by-four
+                      (let ((table (make-array (shape 0 4 0 4) 19101)))
+                         (array-retabulate! table (array-shape table) *)
+                         table))))
+
+   (test "four-by-four vs array-retabulate! on parts"
+      (assert-true (array-equal?
+                      four-by-four
+                      (let ((table (make-array (shape 0 4 0 4) 19101)))
+                         (array-retabulate!
+                            table
+                            (shape 1 2 1 4)
+                            (lambda (v)
+                               (* (vector-ref v 0) (vector-ref v 1)))
+                            (vector - -))
+                         (array-retabulate!
+                            table
+                            (shape 2 4 0 4)
+                            (lambda (a)
+                               (* (array-ref a (vector 0)) (array-ref a (vector 1))))
+                            (make-array (shape 0 2)))
+                         (array-set! table 0 0 0)
+                         (array-set! table (vector 0 1) 0)
+                         (array-set! table (array (shape 0 2) 0 2) 0)
+                         (shape-for-each
+                            (shape 0 1 3 4)
+                            (lambda (v)
+                               (array-set! table v (vector-ref v 0)))
+                            (vector - -))
+                         (let ((arr (share-array
+                                       table
+                                       (shape 1 2 0 1 1 2 3 4 5 6 7 8 1 2 3 4 5 6 7 8)
+                                       (lambda (r k . _)
+                                          (values r k)))))
+                            (array-retabulate! arr (array-shape arr) *))
+                         table))))
+   
+   (test "shape-for-each without index object"
+      (assert-true (let ((em '()))
+                      (shape-for-each
+                         (shape 0 2 -2 0 0 1)
+                         (lambda (u v w)
+                            (set! em (cons (list u v w) em))))
+                      (equal? (reverse em) '((0 -2 0) (0 -1 0) (1 -2 0) (1 -1 0))))))
+
+
+   (test "array-append"
+      (assert-true  (array-equal? (array-append
+                                     (array (shape 0 2 0 2) 'a 'b 'c 'd)
+                                     (array (shape 0 1 0 2) 'e 'f))
+                       (array (shape 0 3 0 2) 'a 'b 'c 'd 'e 'f)))
+      
+      (assert-true (array-equal? (array-append
+                                    (array (shape 0 2 0 2) 'a 'b 'c 'd)
+                                    (array (shape 0 2 0 1) 'e 'f) 1)
+                      (array (shape 0 2 0 3) 'a 'b 'e 'c 'd 'f)))
+      (assert-true (array-equal? (array-append
+                                     (array (shape 0 2 0 2) 'a 'b 'c 'd)
+                                     (array (shape 1 3 0 1) 'e 'f) 1)
+                       (array (shape 0 2 0 3) 'a 'b 'e 'c 'd 'f)))
+
+      )
+   
    )
+
 
 (define (main args)
    (let ((tr (instantiate::terminal-test-runner (suite srfi25-tests))))
-      (if (test-runner-execute tr #t) 0 -1))
-   )
+      (if (test-runner-execute tr #t) 0 -1)))

@@ -20,6 +20,8 @@ DESTDIR = /usr
 INSTLIBDIR = $(DESTDIR)/lib
 INSTBIGLOOLIBDIR = $(INSTLIBDIR)/bigloo/$(BIGLOO_VERSION)
 
+#C Flags
+CCOMMONFLAGS = -ggdb -gdwarf -fPIC
 
 #Bigloo Flags
 BHEAPFLAGS = -I src/Llib -unsafe -q -mkaddheap -mkaddlib \
@@ -30,10 +32,10 @@ BCOMMONFLAGS = -fisa -mkaddlib -fsharing -q \
 
 BSAFEFLAGS = $(BCOMMONFLAGS) -O6 
 
+BPROFILEFLAGS = $(BCOMMONFLAGS) -p -O6
+
 BUNSAFEFLAGS = $(BCOMMONFLAGS) -O6 -unsafe
 
-#C Flags
-CCOMMONFLAGS = -fPIC
 
 # directory variables
 OBJDIR = objs
@@ -56,6 +58,8 @@ _SRCSWOUTDIR = $(foreach src, $(BIGLOOSRCS), $(notdir $(src)))
 _BASEOBJSWOUTDIR = $(_SRCSWOUTDIR:%.scm=%)
 
 SAFEOBJECTS = $(_BASEOBJSWOUTDIR:%=$(OBJDIR)/%_s.o)
+
+PROFILEOBJECTS = $(_BASEOBJSWOUTDIR:%=$(OBJDIR)/%_p.o)
 
 UNSAFEOBJECTS = $(_BASEOBJSWOUTDIR:%=$(OBJDIR)/%_u.o)
 
@@ -83,6 +87,9 @@ TESTCLASSES = $(TESTSRCS:%.scm=%.class)
 
 $(OBJDIR)/%_s.o:src/Llib/%.scm
 	$(BIGLOO)  -c $(BSAFEFLAGS) -o $@ $^
+
+$(OBJDIR)/%_p.o:src/Llib/%.scm
+	$(BIGLOO)  -c $(BPROFILEFLAGS) -o $@ $^
 
 $(OBJDIR)/%_u.o:src/Llib/%.scm
 	$(BIGLOO)  -c $(BUNSAFEFLAGS) -o $@ $^
@@ -161,6 +168,8 @@ $(EUCLASSDIR)/make_lib.class:src/Misc/make_lib.scm
 
 lib: init heap $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).so  \
 	       $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).a   \
+               $(DISTDIR)/lib$(LIBNAME)_p-$(VERSION).so  \
+	       $(DISTDIR)/lib$(LIBNAME)_p-$(VERSION).a   \
                $(DISTDIR)/lib$(LIBNAME)_es-$(VERSION).so \
 	       $(DISTDIR)/lib$(LIBNAME)_u-$(VERSION).so  \
 	       $(DISTDIR)/lib$(LIBNAME)_u-$(VERSION).a   \
@@ -193,6 +202,13 @@ $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).so: $(OBJDIR) $(DISTDIR) $(SAFEOBJECTS)
 $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).a : $(OBJDIR) $(DISTDIR) $(SAFEOBJECTS)
 	$(AR) qcv $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).a $(SAFEOBJECTS);\
 	$(RANLIB) $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).a
+
+$(DISTDIR)/lib$(LIBNAME)_p-$(VERSION).so: $(OBJDIR) $(DISTDIR) $(PROFILEOBJECTS)
+	$(LD) -o $(DISTDIR)/lib$(LIBNAME)_p-$(VERSION).so $(PROFILEOBJECTS) -lc -lm
+
+$(DISTDIR)/lib$(LIBNAME)_p-$(VERSION).a : $(OBJDIR) $(DISTDIR) $(PROFILEOBJECTS)
+	$(AR) qcv $(DISTDIR)/lib$(LIBNAME)_p-$(VERSION).a $(PROFILEOBJECTS);\
+	$(RANLIB) $(DISTDIR)/lib$(LIBNAME)_p-$(VERSION).a
 
 $(DISTDIR)/lib$(LIBNAME)_es-$(VERSION).so : $(OBJDIR) $(DISTDIR) $(ESAFEOBJECTS)
 	$(LD)  -o $(DISTDIR)/lib$(LIBNAME)_es-$(VERSION).so $(ESAFEOBJECTS) -lc -lm
@@ -239,7 +255,7 @@ check-syntax: .afile
 	$(BIGLOO) $(BCOMMONFLAGS) -afile .afile -syntax-check ${CHK_SOURCES}
 
 
-install: all
+install: c
 	for file in $(DISTDIR)/*; do \
 	  $(INSTALL) $$file $(INSTBIGLOOLIBDIR)/`basename $$file`; \
 	done; \
