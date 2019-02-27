@@ -124,9 +124,7 @@
       (array-start array dim)))
 
 (define-inline (array-size array::%array-base)
-   (do ((i 0 (+fx i 1))
-        (size 1 (*fx size (array-length array i))))
-       ((=fx i (array-rank array)) size)))
+   (shape-size (-> array shape)))
 
 (define-inline (array-equal? arr1 arr2)
    (equal? arr1 arr2))
@@ -162,13 +160,13 @@
    (shape-copy (-> array shape)))
 
 (define-inline (array-rank array::%array-base)
-   (vector-length (-> array shape vec)))
+   (shape-rank (-> array shape)))
 
 (define-inline (array-start array::%array-base k::long)
-   (car (vector-ref (-> array shape vec) k)))
+   (shape-start (-> array shape) k))
 
 (define-inline (array-end array::%array-base k::long)
-   (cdr (vector-ref (-> array shape vec) k)))
+   (shape-end (-> array shape) k))
 
 (define-inline (rank-1-array? x)
    (and (array? x)

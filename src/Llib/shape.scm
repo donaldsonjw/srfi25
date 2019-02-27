@@ -47,21 +47,13 @@
 
 (define (shape #!rest bounds)
    (if (pairwise-non-decreasing? bounds)
-       (let ((res (make-vector (/fx (length bounds) 2))))
-          (do ((i 0 (+fx i 1))
-               (lst bounds (cddr lst)))
-              ((=fx i (vector-length res)) (instantiate::%shape (vec res)))
-              (vector-set! res i (cons (car lst) (cadr lst)))))
+       (instantiate::%shape (vec (list->vector bounds)))
        (error "shape"
           "bounds must be an even number of integers that are pairwise non-decreasing"
           bounds)))
 
 (define-inline (shape->list shape::%shape)
-   (do ((i 0 (+fx i 1))
-        (res '() (cons* (cdr (vector-ref (-> shape vec) i))
-                    (car (vector-ref (-> shape vec) i))
-                    res)))
-       ((= i (vector-length (-> shape vec))) (reverse! res))))
+   (vector->list (-> shape vec)))
 
 (define (shape->array shp::%shape)
    (let ((lst (shape->list shp)))
@@ -69,11 +61,11 @@
 
 
 (define-inline (shape-rank shape::%shape)
-   (vector-length (-> shape vec)))
+   (/fx (vector-length (-> shape vec)) 2))
 
 (define-inline (shape-start shape::%shape dim)
    (if (<fx dim (shape-rank shape))
-       (car (vector-ref (-> shape vec) dim))
+       (vector-ref (-> shape vec) (*fx dim 2))
        (raise (instantiate::&index-out-of-bounds-error
                  (proc "shape-start")
                  (msg "invalid index")
@@ -86,7 +78,7 @@
 
 (define-inline (shape-end shape::%shape dim)
    (if (<fx dim (shape-rank shape))
-       (cdr (vector-ref (-> shape vec) dim))
+       (vector-ref (-> shape vec) (+fx 1 (*fx dim 2)))
        (raise (instantiate::&index-out-of-bounds-error
                  (proc "shape-end")
                  (msg "invalid index")
@@ -100,21 +92,12 @@
 (define-inline (shape-size shape::%shape)
    (do ((i 0 (+fx i 1))
         (num-elements 1
-           (let* ((bound (vector-ref (-> shape vec) i))
-                  (bound-len (-fx (cdr bound)
-                                (car bound))))
-              (*fx num-elements bound-len))))
-       ((=fx i (vector-length (-> shape vec))) num-elements)))
+           (*fx num-elements (shape-length shape i))))
+       ((=fx i (shape-rank shape)) num-elements)))
 
 (define-inline (shape-copy shape::%shape)
-   (let ((new-vec (make-vector (vector-length (-> shape vec)))))
-      (do ((i 0 (+fx i 1)))
-          ((=fx i (vector-length (-> shape vec))))
-          (let* ((bound (vector-ref (-> shape vec) i))
-                 (lower (car bound))
-                 (upper (cdr bound)))
-             (vector-set! new-vec i (cons lower upper))))
-      (instantiate::%shape (vec new-vec))))
+   (instantiate::%shape (vec (copy-vector (-> shape vec)
+                                (vector-length (-> shape vec))))))
 
 
 ;;;; shape-for-each from arlib provided with srfi25
