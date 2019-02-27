@@ -3,7 +3,7 @@ BIGLOO = bigloo
 BGLAFILE = bglafile
 BGLJFILE = bgljfile
 BGLTAGS = bgltags
-LD = gcc --shared
+LD = gcc --shared -flto
 AR = ar
 JAR = jar
 RANLIB = ranlib
@@ -255,7 +255,7 @@ check-syntax: .afile
 	$(BIGLOO) $(BCOMMONFLAGS) -afile .afile -syntax-check ${CHK_SOURCES}
 
 
-install: c
+install: c jvm
 	for file in $(DISTDIR)/*; do \
 	  $(INSTALL) $$file $(INSTBIGLOOLIBDIR)/`basename $$file`; \
 	done; \

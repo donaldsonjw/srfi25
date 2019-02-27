@@ -2,7 +2,6 @@
    (library srfi25 btest)
    (main main))
 
-
 (define i_4 (let* ((i (make-array
                          (shape 0 4 0 4)
                          0))
@@ -37,7 +36,7 @@
 ;;; grey crows inside the board proper. Later we put in a blue rook.
 
 (define board
-  (tabulate-array
+  (array-tabulate
    (shape -1 9 -1 9 -1 9 0 2)
    (lambda (t u v w)
      (case w
@@ -162,7 +161,7 @@
 ;;; Build the same chess position directly.
 
 (define board-two
-  (tabulate-array
+  (array-tabulate
    (shape -1 9 -1 9 -1 9 0 2)
    (lambda (t u v w)
      (if (and (= t 4) (= u 3) (= v 3))
@@ -182,7 +181,6 @@
                     'pink)))))))
 
 ;;; Permute the dimensions of the chess board in two different ways.
-;;; The transpose also exercises matrix multiplication.
 
 (define board-three
   (share-array
@@ -243,10 +241,10 @@
    (test "array equality works"
       (assert-true (equal? (array (shape 0 2 0 2) 1 2 3 4)
                       (array (shape 0 2 0 2) 1 2 3 4)))
-      (assert-false (equal? (array (shape 0 2 0 2) 1 2 3 4)
-                       (array (shape 0 2 0 2) 1 2 3 5)))
-      (assert-false (equal? (array (shape 0 2 0 2) 1 2 3 4)
-                       (array (shape 1 3 1 3) 1 2 3 4))))
+       (assert-false (equal? (array (shape 0 2 0 2) 1 2 3 4)
+                        (array (shape 0 2 0 2) 1 2 3 5)))
+       (assert-false (equal? (array (shape 0 2 0 2) 1 2 3 4)
+                        (array (shape 1 3 1 3) 1 2 3 4))))
 
    (test "shape-rank works"
       (assert= (shape-rank (shape)) 0)
@@ -509,9 +507,9 @@
 
 ;;;; arlib tests
 
-   (test "i_4 vs tabulate-array"
+   (test "i_4 vs array-tabulate"
       (assert-true (array-equal? i_4
-                      (tabulate-array
+                      (array-tabulate
                          (shape 0 4 0 4)
                          (lambda (j k)
                             (if (= j k) 1 0))))))
@@ -558,47 +556,31 @@
                          (lambda (j k)
                             (values (+ j 1) (+ k 1)))))))
 
-   ; (test "i_4 transpose"
-   ;    (assert-true (array-equal? i_4 (transpose i_4))))
-
-   ; (test "threed123 transpose"
-   ;    (assert-true  (array-equal? threed123
-   ;                     (apply transpose threed312 rot231))))
+   (test "i_4 transpose"
+       (assert-true (array-equal? i_4 (array-transpose i_4))))
 
    (test "board vs board-two"
       (assert-true (array-equal? board board-two)))
 
-   ; (test "board-three vs transpose of board-two"
-   ;    (assert-true (array-equal? board-three
-   ;                (transpose board-two 3 0 1 2))))
-
-   ; (test "board-two versus transpose of board-two"
-   ;    (assert-true (array-equal? (share-array
-   ;                      board-two
-   ;                      (shape -1 9 0 2 -1 9 -1 9)
-   ;                      (lambda (t w u v)
-   ;                         (values t u v w)))
-   ;                    (transpose board-two 0 3 1 2))))
-
    (test "board-nothing"
       (assert-true (array-equal? board-nothing (array (array-shape board-nothing)))))
 
-   (test "tabulate-array! with vector"
+   (test "array-tabulate! with vector"
       (assert-true
-         (array-equal? (tabulate-array (shape 4 8 2 5 0 1) *)
-            (tabulate-array! (shape 4 8 2 5 0 1)
+         (array-equal? (array-tabulate (shape 4 8 2 5 0 1) *)
+            (array-tabulate! (shape 4 8 2 5 0 1)
                (lambda (v)
                   (* (vector-ref v 0)
                      (vector-ref v 1)
                      (vector-ref v 2)))
                (vector * * *)))))
 
-   (test "tabulate-array! with array"
-      (assert-true (array-equal? (tabulate-array (shape 4 8 2 5 0 1) *)
+   (test "array-tabulae! with array"
+      (assert-true (array-equal? (array-tabulate (shape 4 8 2 5 0 1) *)
                       (let ((index (share-array (make-array (shape 0 2 0 3))
                                       (shape 0 3)
                                       (lambda (k) (values 1 k)))))
-                         (tabulate-array! (shape 4 8 2 5 0 1)
+                         (array-tabulate! (shape 4 8 2 5 0 1)
                             (lambda (a)
                                (* (array-ref a 0)
                                   (array-ref a 1)
@@ -614,8 +596,8 @@
                          (share-array (array (shape) 2) (shape 1 2 1 4) (lambda _ (values))))
                       (array (shape 1 2 1 4) 3 3 3))))
 
-   (test "four-by-four vs tabulate-array"
-      (assert-true (array-equal? four-by-four (tabulate-array (shape 0 4 0 4) *))))
+   (test "four-by-four vs array-tabulate"
+      (assert-true (array-equal? four-by-four (array-tabulate (shape 0 4 0 4) *))))
 
    (test "four-by-four vs array-retabulate!"
       (assert-true (array-equal?
@@ -678,9 +660,34 @@
       (assert-true (array-equal? (array-append
                                      (array (shape 0 2 0 2) 'a 'b 'c 'd)
                                      (array (shape 1 3 0 1) 'e 'f) 1)
-                       (array (shape 0 2 0 3) 'a 'b 'e 'c 'd 'f)))
+                      (array (shape 0 2 0 3) 'a 'b 'e 'c 'd 'f))))
 
-      )
+   (test "array-map works"
+      (let ((arr1 (array (shape 0 2 0 2) 1 2 3 4)))
+         (assert-equal? (array-map (lambda (x) (+ x 1)) arr1)
+            (array (shape 0 2 0 2) 2 3 4 5))))
+
+   (test "array-map! works"
+      (let ((arr1 (array (shape 0 2 0 2) 1 2 3 4)))
+         (array-map! arr1 (lambda (x) (+ x 1)) arr1)
+         (assert-equal? arr1
+            (array (shape 0 2 0 2) 2 3 4 5))))
+
+   (test "array->vector works"
+      (let ((arr (array (shape 0 2 0 2 0 2) 1 2 3 4 5 6 7 8)))
+         (assert-equal? (array->vector arr) (vector 1 2 3 4 5 6 7 8))))
+
+   (test "array->list works"
+      (let ((arr (array (shape 0 2 0 2 0 2) 1 2 3 4 5 6 7 8)))
+         (assert-equal? (array->list arr) (list 1 2 3 4 5 6 7 8))))
+
+   (test "transpose works"
+      (let ((arr1 (array (shape 0 3 0 2) 1 2 3 4 5 6))
+            (arr2 (array (shape 0 3 0 1) 1 2 3)))
+         (assert-equal? (array-transpose arr1)
+            (array (shape 0 2 0 3) 1 3 5 2 4 6))
+         (assert-equal? (array-transpose arr2)
+            (array (shape 0 1 0 3) 1 2 3))))
    
    )
 
