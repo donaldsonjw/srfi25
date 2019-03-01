@@ -18,8 +18,8 @@
       (inline array-start array::%array-base k::long)
       (inline array-end array::%array-base k::long)
       (inline array-shape array::%array-base)
-      (array-ref* array::%array-base #!rest indices)
-      (array-set*! array::%array-base #!rest indices+val)
+      (array-ref array::%array-base #!rest indices)
+      (array-set! array::%array-base #!rest indices+val)
       (share-array array::%array-base shape::%shape proc::procedure)
       (inline array-ref2 array::%array-base i1::long i2::long)
       (inline array-set2! array::%array-base i1::long i2::long val)
@@ -43,7 +43,8 @@
       (array-set-w/array! array::%array-base indices::%array-base val)
       (array-ref-w/vector array::%array-base indices::vector)
       (array-ref-w/array array::%array-base indices::%array-base)
-      (array-transpose array::%array)))
+      (array-transpose array::%array)
+      (array-for-each arr::%array-base proc::procedure )))
 
 
 (define-inline (index-normalize lower-bound index)
@@ -253,7 +254,7 @@
        (let ((shared-array::%shared-array array))
           (-> shared-array index))))
 
-(define (array-ref* array::%array-base #!rest indices)
+(define (array-ref array::%array-base #!rest indices)
    (let ((len (length indices)))
       (cond  ((=fx len 0)
               (array-ref0 array))
@@ -335,7 +336,7 @@
           (vector-set! (-> array vec)
              ((-> array index) i1 i2 (-> array shape) #unspecified) val))))
 
-(define (array-set*! array::%array-base #!rest indices+val)
+(define (array-set! array::%array-base #!rest indices+val)
    (let ((len (length indices+val)))
       (cond ((=fx len 1)
              (array-set0! array (car indices+val)))
@@ -529,6 +530,11 @@
               (array-set1! ind d k)
               (do-dim (+fx d 1))))))))
 
+(define (array-for-each arr::%array-base proc::procedure)
+   (array-for-each-index/vector arr
+      (lambda (v) (proc (array-ref-w/vector arr v)))
+      (make-vector (array-rank arr))))
+
 
 ;;; array-tabulate and friends from arlib provided with srfi25
 (define (array-tabulate shp::%shape proc::procedure)
@@ -536,7 +542,7 @@
      
      (shape-for-each
         shp
-        (lambda (ix) (array-set*! arr ix (apply-to-vector proc ix)))
+        (lambda (ix) (array-set! arr ix (apply-to-vector proc ix)))
         (make-vector (shape-rank shp)))
      arr))
         
@@ -544,7 +550,7 @@
    (let ((arr (make-array shp)))
       (shape-for-each
          shp
-         (lambda (ix) (array-set*! arr ix (proc ix)))
+         (lambda (ix) (array-set! arr ix (proc ix)))
          ind)
       arr))
 
@@ -558,7 +564,7 @@
       (shape-for-each
          shp
          (lambda (ix)
-            (array-set*! arr ix (proc ix)))
+            (array-set! arr ix (proc ix)))
          (car o))))
 
 
