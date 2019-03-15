@@ -102,7 +102,6 @@
 
 ;;;; shape-for-each from arlib provided with srfi25
 (define (shape-for-each shp::%shape proc::procedure . o)
-   (print "calling shape-for-each")
   (if (null? o)
       (shape-for-each/arguments shp proc)
       (if (vector? (car o))

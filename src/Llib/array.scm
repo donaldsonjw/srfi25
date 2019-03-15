@@ -1,10 +1,13 @@
 (module srfi25/array
+   (include "array.sch")
    (import srfi25/shape
            srfi25/apply)
    (export
       (abstract-class %array-base
          shape::%shape
-         vec::vector)
+          tvec::vector
+         coeff::vector
+         store::vector)
       (final-class %array::%array-base)
       (final-class %shared-array::%array-base
          index::procedure)
@@ -29,7 +32,6 @@
       (inline array-ref0 array::%array-base)
       (inline rank-1-array? x)
       (inline vector/rank-1-array->list x)
-      (array-for-each-index arr::%array-base proc::procedure . o)
       (array-tabulate shp::%shape proc::procedure)
       (array-tabulate! shp::%shape proc::procedure ind)
       (array->list arr::%array-base)
@@ -39,12 +41,22 @@
       (array-retabulate! arr::%array-base shp::%shape proc::procedure . o)
       (array-append a1::%array-base a2::%array-base #!optional (dim 0))
       (array-copy::%array-base array::%array-base)
-      (array-set-w/vector! array::%array-base indices::vector val)
+      (inline array-set-w/vector! array::%array-base indices::vector val)
       (array-set-w/array! array::%array-base indices::%array-base val)
-      (array-ref-w/vector array::%array-base indices::vector)
+      (inline array-ref-w/vector array::%array-base indices::vector)
       (array-ref-w/array array::%array-base indices::%array-base)
       (array-transpose array::%array)
-      (array-for-each arr::%array-base proc::procedure )))
+      (generic garray-ref2 array::%array-base i1::long i2::long)
+      (generic garray-set2! array::%array-base i1::long i2::long val)
+      (inline array-for-each-index arr::%array-base proc::procedure . o)
+      (array-for-each-index/arguments arr::%array-base proc::procedure)
+      (array-for-each-index/vector arr::%array-base proc::procedure ind::vector)
+      (array-for-each-index/array arr::%array-base proc::procedure ind::%array-base)
+      (inline array-for-each arr::%array-base proc::procedure)
+      (inline array-translation-vector array::%array)
+      (inline array-coefficient-vector array::%array)
+      (inline shape-translation-vector shp::%shape)
+      (inline shape-coefficient-vector shp::%shape)))
 
 
 (define-inline (index-normalize lower-bound index)
@@ -56,6 +68,57 @@
         (res #t (and res (shape-bounded? shape i (car lst)))))
        ((or (not res) (=fx i (shape-rank shape))) res)))
 
+(define-inline (shape-translation-vector shp::%shape)
+   (let ((res (make-vector (shape-rank shp))))
+      (do ((i 0 (+fx i 1)))
+          ((=fx i (shape-rank shp)) res)
+          (vector-set! res i (shape-start shp i)))))
+
+(define-inline (array-translation-vector array::%array)
+   (let ((res (make-vector (array-rank array))))
+      (do ((i 0 (+fx i 1)))
+          ((=fx i (array-rank array)) res)
+          (vector-set! res i (array-start array i)))))
+
+(define-inline (shape-coefficient-vector shp::%shape)
+   (let* ((rank  (shape-rank shp))
+          (res (make-vector rank 1)))
+      (do ((i (-fx rank 1) (-fx i 1))
+           (offset 1 (* offset (shape-length shp (if (<fx (+fx i 1) rank)
+                                                     (+fx i 1)
+                                                     i)))))
+          ((<fx i 0) res)
+          (vector-set! res i offset))))
+
+(define-inline (array-coefficient-vector array::%array)
+   (let* ((rank  (array-rank array))
+          (res (make-vector rank 1)))
+      (do ((i (-fx rank 1) (-fx i 1))
+           (offset 1 (* offset (array-length array (if (< (+ i 1) rank)
+                                                       (+ i 1)
+                                                       i)))))
+          ((<fx i 0) res)
+          (vector-set! res i offset))))
+
+
+(define-syntax receive*
+   (syntax-rules ()
+      ((_ vals producer expr ...)
+       (let ((vals (call-with-values (lambda () producer)
+                                     (lambda args args))))
+          expr ...))))
+
+
+(define (affine-proc->coeffs proc rank)
+   (receive* Cs (apply proc (make-list rank 0))
+      (let ([cvecs (map (lambda (v) (make-vector rank)) Cs)]
+            [cnt   (iota rank)])
+         (do ([i 0 (+fx i 1)])
+             ([=fx i rank] (values Cs cvecs))
+             (receive* Ks (apply proc (map (lambda (j) (if (=fx j i) 1 0)) cnt))
+                (for-each (lambda [v k c]
+                             (vector-set! v i (-fx k c)))
+                   cvecs Ks Cs))))))
 
 (define (get-array-index-procedure shape::%shape)
    (let ((rank (shape-rank shape)))
@@ -132,8 +195,10 @@
 
 (define (make-array shape::%shape #!optional (default #unspecified))
    (instantiate::%array (shape (shape-copy shape))
-                        (vec (make-vector (shape-size shape)
-                                  default))))
+                        (store (make-vector (shape-size shape)
+                                default))
+                        (tvec (shape-translation-vector shape))
+                        (coeff (shape-coefficient-vector shape))))
 
 (define (array shape::%shape #!rest vals)
    (if (= (shape-size shape) (length vals))
@@ -142,7 +207,7 @@
                      (lst vals))
              (if (pair? lst)
                  (let ((curr (car lst)))
-                    (vector-set! (-> new-array vec) i curr)
+                    (vector-set! (-> new-array store) i curr)
                     (loop (+fx i 1)
                        (cdr lst)))
                  new-array)))
@@ -187,12 +252,27 @@
 (define-inline (array-ref0 array::%array-base)
    (if (isa? array %array)
        (let ((array::%array array))
-          (vector-ref (-> array vec) 0))
+          (vector-ref (-> array store) 0))
        (let ((array::%shared-array array))
-          (vector-ref (-> array vec)
+          (vector-ref (-> array store)
              ((-> array index) #unspecified)))))
 
-(define (array-ref-w/vector array::%array-base indices::vector)
+
+(define-inline (array-ref-w/vector array::%array-base indices::vector)
+   (if (isa? array %array)
+       (case (vector-length indices)
+          ((0) (array-ref0 array))
+          (else
+           (let ((t (make-stack-vector (vector-length indices))))
+              (vector-ref (-> array store)
+                 (vector* (vector- t indices (-> array tvec))
+                    (-> array coeff))))))
+       (let ((shared-array::%shared-array array))
+          (vector-ref (-> shared-array store)
+             (apply-index-proc-to-vector (-> shared-array index) indices
+                (-> array shape) #unspecified)))))
+
+(define (array-ref-w/vector-old array::%array-base indices::vector)
    (if (isa? array %array)
        (case (vector-length indices)
           ((0) (array-ref0 array))
@@ -200,22 +280,22 @@
           ((2)
            (array-ref2 array (vector-ref indices 0) (vector-ref indices 1)))
           (else
-           (vector-ref (-> array vec)
+           (vector-ref (-> array store)
               (apply-index-proc-to-vector (get-array-index-procedure (-> array shape))
                  indices (-> array shape) #unspecified))))
        (let ((shared-array::%shared-array array))
-          (vector-ref (-> shared-array vec)
+          (vector-ref (-> shared-array store)
              (apply-index-proc-to-vector (-> shared-array index) indices
                 (-> array shape) #unspecified)))))
 
 (define (array-ref-w/array array::%array-base indices::%array-base)
    (if (isa? array %array)
-       (vector-ref (-> array vec)
+       (vector-ref (-> array store)
           (apply-index-proc-to-array (get-array-index-procedure
                               (-> array shape))
               indices  (-> array shape) #unspecified))
        (let ((shared-array::%shared-array array))
-          (vector-ref (-> shared-array vec)
+          (vector-ref (-> shared-array store)
              (apply-index-proc-to-array (-> shared-array index)
                  indices (-> shared-array shape) #unspecified)))))
 
@@ -228,24 +308,30 @@
           (if (isa? array %array)
               (let* ((array::%array array)
                      (lower (array-start array 0)))
-                 (vector-ref (-> array vec)
+                 (vector-ref (-> array store)
                     (-fx i1 lower)))
               (let ((array::%shared-array array))
-                 (vector-ref (-> array vec)
+                 (vector-ref (-> array store)
                     ((-> array index) i1 (-> array shape) #unspecified)))))))
+
+
+(define-generic (garray-ref2 array::%array-base i1::long i2::long))
+
+(define-method (garray-ref2 array::%array i1::long i2::long)
+   (array-ref2 array i1 i2))
 
 (define-inline (array-ref2 array::%array-base i1::long i2::long)
    (if (isa? array %array)
        (let* ((array::%array array)
               (lower1 (array-start array 0))
               (lower2 (array-start array 1))
-              (length1 (array-length array 1)))
-          (vector-ref (-> array vec)
+              (length2 (array-length array 1)))
+          (vector-ref (-> array store)
              (+fx (*fx (-fx i1 lower1)
-                     length1)
+                     length2)
                 (-fx i2 lower2))))
        (let ((array::%shared-array array))
-          (vector-ref (-> array vec)
+          (vector-ref (-> array store)
              ((-> array index) i1 i2 (-> array shape) #unspecified)))))
 
 (define (get-index-procedure array::%array-base)
@@ -263,7 +349,7 @@
              ((=fx len 2)
               (array-ref2 array (car indices) (cadr indices)))
              ((>fx len 2)
-              (vector-ref (-> array vec)
+              (vector-ref (-> array store)
                  (apply (get-index-procedure array) 
                     (append! indices (list (-> array shape) #unspecified)))))
              (else
@@ -272,12 +358,30 @@
 (define-inline (array-set0! array::%array-base val)
    (if (isa? array %array)
        (let ((array::%array array))
-          (vector-set! (-> array vec) 0 val))
+          (vector-set! (-> array store) 0 val))
        (let ((array::%shared-array array))
-          (vector-set! (-> array vec)
+          (vector-set! (-> array store)
              ((-> array index) (-> array shape) #unspecified) val))))
 
-(define (array-set-w/vector! array::%array-base indices::vector val)
+
+ 
+(define-inline (array-set-w/vector! array::%array-base indices::vector val)
+   (if (isa? array %array)
+       (case (vector-length indices) 
+          ((0) (array-set0! array val))
+          (else
+           (let ((t (make-stack-vector (vector-length indices))))
+              (vector-set! (-> array store)
+                 (vector* (vector- t indices (-> array tvec))
+                    (-> array coeff))
+                 val))))
+       (let ((shared-array::%shared-array array))
+          (vector-set! (-> shared-array store)
+             (apply-index-proc-to-vector (-> shared-array index) indices
+                (-> shared-array shape)
+                val) val))))
+
+(define (array-set-w/vector!-old array::%array-base indices::vector val)
    (if (isa? array %array)
        (case (vector-length indices) 
           ((0) (array-set0! array val))
@@ -286,24 +390,24 @@
            (array-set2! array (vector-ref indices 0) (vector-ref indices 1)
               val))
           (else
-           (vector-set! (-> array vec)
+           (vector-set! (-> array store)
               (apply-index-proc-to-vector (get-array-index-procedure
                                              (-> array shape))
                  indices (-> array shape) val) val)))
        (let ((shared-array::%shared-array array))
-          (vector-set! (-> shared-array vec)
+          (vector-set! (-> shared-array store)
              (apply-index-proc-to-vector (-> shared-array index) indices
                 (-> shared-array shape)
                 val) val))))
 
 (define (array-set-w/array! array::%array-base indices::%array-base val)
    (if (isa? array %array)
-       (vector-set! (-> array vec)
+       (vector-set! (-> array store)
           (apply-index-proc-to-array (get-array-index-procedure
                               (-> array shape))
              indices (-> array shape) val) val)
        (let ((shared-array::%shared-array array))
-          (vector-set! (-> shared-array vec)
+          (vector-set! (-> shared-array store)
              (apply-index-proc-to-array (-> shared-array index) indices
                 (-> shared-array shape) val) val))))
 
@@ -316,11 +420,16 @@
           (if (isa? array %array)
               (let* ((array::%array array)
                      (lower (array-start array 0)))
-                 (vector-set! (-> array vec)
+                 (vector-set! (-> array store)
                     (-fx i1 lower) val))
               (let ((array::%shared-array array))
-                 (vector-set! (-> array vec)
+                 (vector-set! (-> array store)
                     ((-> array index) i1 (-> array shape) #unspecified) val))))))
+
+(define-generic (garray-set2! array::%array-base i1::long i2::long val))
+
+(define-method (garray-set2! array::%array i1::long i2::long val)
+   (array-set2! array i1 i2 val))
 
 (define-inline (array-set2! array::%array-base i1::long i2::long val)
    (if (isa? array %array)
@@ -328,12 +437,12 @@
               (lower1 (array-start array 0))
               (lower2 (array-start array 1))
               (length1 (array-length array 1)))
-          (vector-set! (-> array vec)
+          (vector-set! (-> array store)
              (+fx (*fx (-fx i1 lower1)
                      length1)
                 (-fx i2 lower2)) val))
        (let ((array::%shared-array array))
-          (vector-set! (-> array vec)
+          (vector-set! (-> array store)
              ((-> array index) i1 i2 (-> array shape) #unspecified) val))))
 
 (define (array-set! array::%array-base #!rest indices+val)
@@ -354,7 +463,7 @@
                          (list (-> array shape)
                             (list-ref indices+val (-fx len 1))))))
                 (lambda (index val)
-                   (vector-set! (-> array vec) index val))))
+                   (vector-set! (-> array store) index val))))
             (else
              (error "array-set!" "invalid arguments" indices+val)))))
 
@@ -464,7 +573,9 @@
       (get-shared-array-index-procedure array shape proc)
       (instantiate::%shared-array (shape copy)
                                   (index index-proc)
-                                  (vec (-> array vec)))))
+                                  (coeff (vector))
+                                  (tvec (vector))
+                                  (store (-> array store)))))
 
 
 (define-method (object-equal? arr1::%array-base obj)
@@ -487,7 +598,7 @@
 
 
 ;;; array-for-each-index from arlib provided with srfi25 
-(define (array-for-each-index arr::%array-base proc::procedure . o)
+(define-inline (array-for-each-index arr::%array-base proc::procedure . o)
   (if (null? o)
       (array-for-each-index/arguments arr proc)
       (if (vector? (car o))
@@ -495,46 +606,97 @@
           (array-for-each-index/array arr proc (car o)))))
 
 (define (array-for-each-index/arguments arr::%array-base proc::procedure)
-  (let ((r (array-rank arr)))
-    (let ((vec (make-vector r)))
-      (let do-dim ((d 0))
-        (if (=fx d r)
-            (apply-to-vector proc vec)
-            (let ((e (array-end arr d)))
-              (do ((k (array-start arr d) (+fx k 1)))
-                ((=fx k e))
-                (vector-set! vec d k)
-                (do-dim (+fx d 1)))))))))
+   (let ((r::long (array-rank arr)))
+      (case r
+         ((0)
+          (proc))
+         ((1)
+          (do ((i::long (array-start arr 0) (+fx i 1)))
+              ((=fx i (array-end arr 0)))
+              (proc i)))
+         ((2)
+          (do ((i::long (array-start arr 0) (+fx i 1)))
+              ((=fx i (array-end arr 0)))
+              (do ((j::long (array-start arr 1) (=fx j 1)))
+                  ((=fx j (array-end arr 1)))
+                  (proc i j))))
+         (else (let ((vec (make-vector r)))
+                  (let do-dim ((d::long 0))
+                     (if (=fx d r)
+                         (apply-to-vector proc vec)
+                         (let ((e::long (array-end arr d)))
+                            (do ((k::long (array-start arr d) (+fx k 1)))
+                                ((=fx k e))
+                                (vector-set! vec d k)
+                                (do-dim (+fx d 1)))))))))))
 
 (define (array-for-each-index/vector arr::%array-base proc::procedure ind::vector)
   ;; ind is a vector
-   (let ((r (array-rank arr)))
-      (let do-dim ((d 0))
-         (if (= d r)
-             (proc ind)
-             (let ((e (array-end arr d)))
-                (do ((k (array-start arr d) (+fx k 1)))
-                    ((=fx k e))
-                    (vector-set! ind d k)
-                    (do-dim (+fx d 1))))))))
+   (let ((r::long (array-rank arr)))
+      (case r
+         ((0)
+          (proc ind))
+         ((1)
+          (do ((i::long (array-start arr 0) (+fx i 1)))
+              ((=fx i (array-end arr 0)))
+              (vector-set! ind 0 i)
+              (proc ind)))
+         ((2)
+          (do ((i::long (array-start arr 0) (+fx i 1)))
+              ((=fx i (array-end arr 0)))
+              (vector-set! ind 0 i)
+              (do ((j::long (array-start arr 1) (+fx j 1)))
+                  ((=fx j (array-end arr 1)))
+                  (vector-set! ind 1 j)
+                  (proc ind))))
+         (else
+          (let do-dim ((d::long 0))
+             (if (= d r)
+                 (proc ind)
+                 (let ((e::long (array-end arr d)))
+                    (do ((k::long (array-start arr d) (+fx k 1)))
+                        ((=fx k e))
+                        (vector-set! ind d k)
+                        (do-dim (+fx d 1))))))))))
 
 (define (array-for-each-index/array arr::%array-base proc::procedure ind::%array-base)
   ;; ind is an array but not a vector
-  (let ((r (array-rank arr)))
-    (let do-dim ((d 0))
-      (if (= d r)
-          (proc ind)
-          (let ((e (array-end arr d)))
-            (do ((k (array-start arr d) (+fx k 1)))
-              ((=fx k e))
-              (array-set1! ind d k)
-              (do-dim (+fx d 1))))))))
+   (let ((r::long (array-rank arr)))
+      (case r
+         ((0)
+          (proc ind))
+         ((1)
+          (do ((i::long (array-start arr 0) (+fx i 1)))
+              ((=fx i (array-end arr 0)))
+              (array-set1! ind 0 i)
+              (proc ind)))
+         ((2)
+          (do ((i::long (array-start arr 0) (+fx i 1)))
+              ((=fx i (array-end arr 0)))
+              (array-set1! ind 0 i)
+              (do ((j::long (array-start arr 1) (+fx j 1)))
+                  ((=fx j (array-end arr 1)))
+                  (array-set1! ind 1 j)
+                  (proc ind))))
+         (else
+          (let do-dim ((d::long 0))
+             (if (=fx d r)
+                 (proc ind)
+                 (let ((e::long (array-end arr d)))
+                    (do ((k::long (array-start arr d) (+fx k 1)))
+                        ((=fx k e))
+                        (array-set1! ind d k)
+                        (do-dim (+fx d 1))))))))))
 
-(define (array-for-each arr::%array-base proc::procedure)
-   (array-for-each-index/vector arr
-      (lambda (v) (proc (array-ref-w/vector arr v)))
-      (make-vector (array-rank arr))))
-
+(define-inline (array-for-each arr::%array-base proc::procedure)
+   (if (isa? arr %array)
+       (let ((arr::%array arr))
+        (do ((i::long 0 (+fx i 1)))
+            ((=fx i (vector-length (-> arr store))))
+            (proc (vector-ref (-> arr store) i))))
+       (array-for-each-index/vector arr
+          (lambda (v) (proc (array-ref-w/vector arr v)))
+          (make-vector (array-rank arr)))))
 
 ;;; array-tabulate and friends from arlib provided with srfi25
 (define (array-tabulate shp::%shape proc::procedure)
