@@ -17,6 +17,16 @@
 (define (srfi25/apply:val-missing? val)
    (eq? val +srfi25/apply-unspecified+))
 
+(define-inline (vector/rank-1-array->list x)
+   (cond ((vector? x)
+          (vector->list x))
+         ((rank-1-array? x)
+          (do ((i 0 (+fx i 1))
+               (res '() (cons (array-ref1 x i) res)))
+              ((=fx i (array-end x 0)) (reverse! res))))
+         (else
+          (error "vector/rank-1-array->list" "unsupported type" x))))
+
 (define (apply-to-vector proc::procedure vec::vector )
    (let ((len (vector-length vec)))
       (case len

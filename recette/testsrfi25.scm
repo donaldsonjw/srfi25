@@ -209,7 +209,7 @@
          0 2 4 6
          0 3 6 9))
 
-(define-test-suite srfi25-tests
+(define-test-suite srfi25-tests-sub1
    
    (test "shape works"
       (assert-true (shape? (shape)))
@@ -318,7 +318,7 @@
       (assert-eq? (array-ref (make-array (shape -1 1) 'c) 0) 'c)
       (assert-eq? (array-ref (make-array (shape 1 2 3 4 5 6 7 8) 'd) 1 3 5 7) 'd))
 
-   (test "array-ref of make-array using vector indicies works"
+   (test "array-ref of make-array using vector indices works"
       (assert-eq? (array-ref (make-array (shape) 'a) '#()) 'a)
       (assert-eq? (array-ref (make-array (shape -1 1) 'b) '#(-1)) 'b)
       (assert-eq? (array-ref (make-array (shape -1 1) 'c) '#(0)) 'c)
@@ -378,8 +378,9 @@
       (let ((arr (make-array (shape 1 2 3 4 5 6 7 8) 'o)))
          (array-set! arr (array (shape 0 4) 1 3 5 7) 'd)
          (assert-eq? (array-ref arr 1 3 5 7) 'd))
-      )
-   
+      ))
+
+(define-test-suite srfi25-tests-sub2
    (test "array sharing with changes works"
       (let* ((org (array (shape 6 9 0 2) 'a 'b 'c 'd 'e 'f))
              (brk (share-array
@@ -560,6 +561,10 @@
        (assert-true (array-equal? i_4 (array-transpose i_4))))
 
    (test "board vs board-two"
+      (with-output-to-file "board.txt"
+         (lambda () (print board)))
+      (with-output-to-file "board2.txt"
+         (lambda () (print board-two)))
       (assert-true (array-equal? board board-two)))
 
    (test "board-nothing"
@@ -575,7 +580,7 @@
                      (vector-ref v 2)))
                (vector * * *)))))
 
-   (test "array-tabulae! with array"
+   (test "array-tabulate! with array"
       (assert-true (array-equal? (array-tabulate (shape 4 8 2 5 0 1) *)
                       (let ((index (share-array (make-array (shape 0 2 0 3))
                                       (shape 0 3)
@@ -585,8 +590,7 @@
                                (* (array-ref a 0)
                                   (array-ref a 1)
                                   (array-ref a 2)))
-                            index))))
-      )
+                            index)))))
    (test "array-sum"
       (assert-true (array-equal?
                       (array-map
@@ -687,11 +691,14 @@
          (assert-equal? (array-transpose arr1)
             (array (shape 0 2 0 3) 1 3 5 2 4 6))
          (assert-equal? (array-transpose arr2)
-            (array (shape 0 1 0 3) 1 2 3))))
-   
-   )
+            (array (shape 0 1 0 3) 1 2 3)))))
 
+(define srfi25-tests (instantiate::suite (description 'srfi-tests)
+                                         (tests '())
+                                         (subsuites
+                                            (list srfi25-tests-sub1 srfi25-tests-sub2))))
 
 (define (main args)
-   (let ((tr (instantiate::terminal-test-runner (suite srfi25-tests))))
-      (if (test-runner-execute tr #t) 0 -1)))
+    (let ((tr (instantiate::terminal-test-runner (suite srfi25-tests))))
+       (if (test-runner-execute tr #t) 0 -1))
+    )

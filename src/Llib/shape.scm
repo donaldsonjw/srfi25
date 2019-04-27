@@ -16,7 +16,10 @@
       (inline shape-bounded? shape::%shape dim::long v::long)
       (inline shape->list shape::%shape)
       (shape->array shp::%shape)
-      (shape-for-each shp::%shape proc::procedure . o)))
+      (shape-for-each shp::%shape proc::procedure . o)
+      (inline shape-translation-vector shp::%shape)
+      (inline shape-coefficient-vector shp::%shape)
+      (inline shape->startv/endv shp::%shape)))
 
 
 (define-method (object-hashnumber obj::%shape)
@@ -98,6 +101,34 @@
 (define-inline (shape-copy shape::%shape)
    (instantiate::%shape (vec (copy-vector (-> shape vec)
                                 (vector-length (-> shape vec))))))
+
+
+(define-inline (shape->startv/endv shp::%shape)
+   (let* ((rank (shape-rank shp))
+          (startv (make-vector rank))
+          (endv (make-vector rank)))
+      (do ((i 0 (+fx i 1)))
+          ((= i rank) (values startv endv))
+          (vector-set! startv i (shape-start shp i))
+          (vector-set! endv i (shape-end shp i)))))
+
+(define-inline (shape-translation-vector shp::%shape)
+   (let ((res (make-vector (shape-rank shp))))
+      (do ((i 0 (+fx i 1)))
+          ((=fx i (shape-rank shp)) res)
+          (vector-set! res i (shape-start shp i)))))
+
+(define-inline (shape-coefficient-vector shp::%shape)
+   (let* ((rank  (shape-rank shp))
+          (res (make-vector rank 1)))
+      (let ((offset 1))
+         (do ((i (-fx rank 1) (-fx i 1)))
+             ((<fx i 0) res)
+             (set! offset (*fx offset
+                             (if (<fx (+fx i 1) rank)
+                                 (shape-length shp (+fx i 1))
+                                 1)))
+             (vector-set! res i offset)))))
 
 
 ;;;; shape-for-each from arlib provided with srfi25
