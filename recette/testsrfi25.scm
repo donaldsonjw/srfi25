@@ -693,6 +693,15 @@
          (assert-equal? (array-transpose arr2)
             (array (shape 0 1 0 3) 1 2 3)))))
 
+
+; (define-test-suite srfi25-tests-sub3
+
+;    (test "make-s64array works"
+;       (let ((arr1 (make-s64array (shape 0 2 0 2) #s64:1)))
+;          (print "arr1: " arr1)
+;          (assert-equal? (array-ref arr1 0 0) #s64:1))))
+
+
 (define srfi25-tests (instantiate::suite (description 'srfi-tests)
                                          (tests '())
                                          (subsuites

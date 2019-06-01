@@ -10,6 +10,10 @@ RANLIB = ranlib
 INSTALL = install
 LINK = ln
 MAKEINFO = makeinfo
+space:=
+space+=
+colon:=:
+pound:=\#
 
 BIGLOO_VERSION := $(shell $(BIGLOO) -eval "(print *bigloo-version*) (exit 0)" -q)
 BIGLOOLIBDIR := $(shell $(BIGLOO) -eval "(print *default-lib-dir*) (exit 0)" -q)
@@ -21,20 +25,20 @@ INSTLIBDIR = $(DESTDIR)/lib
 INSTBIGLOOLIBDIR = $(INSTLIBDIR)/bigloo/$(BIGLOO_VERSION)
 
 #C Flags
-CCOMMONFLAGS = -ggdb -gdwarf -fPIC
+CCOMMONFLAGS = -fPIC
 
 #Bigloo Flags
-BHEAPFLAGS = -I src/Llib -unsafe -q -mkaddheap -mkaddlib \
+BHEAPFLAGS = -I src/Llib -I $(GENSCMDIR) -unsafe -q -mkaddheap -mkaddlib \
 	     -heap-library $(LIBNAME)
 
 BCOMMONFLAGS = -fisa -mkaddlib -fsharing -q \
-               -copt '$(CCOMMONFLAGS)' -I src/Llib
+               -copt '$(CCOMMONFLAGS)' -I src/Llib -I $(GENSCMDIR)
 
 BSAFEFLAGS = $(BCOMMONFLAGS) -O6 
 
 BPROFILEFLAGS = $(BCOMMONFLAGS) -p -O6
 
-BUNSAFEFLAGS = $(BCOMMONFLAGS) -O6 -unsafe
+BUNSAFEFLAGS = $(BCOMMONFLAGS) -Obench
 
 
 # directory variables
@@ -44,10 +48,58 @@ SCLASSDIR = classes_s/bigloo/$(LIBNAME)
 UCLASSDIR = classes_u/bigloo/$(LIBNAME)
 ESCLASSDIR = classes_es/bigloo/$(LIBNAME)
 EUCLASSDIR = classes_eu/bigloo/$(LIBNAME)
+GENSCMDIR = src/Llib/genenerated
 
+
+# defines
+define generateArrayScm =
+$(GENSCMDIR)/$(1)array.scm: src/Llib/array.scm.in $(GENSCMDIR)/$(1)array.sch
+	@if [ "$(1) " = " " ]; then \
+	  sed -e "s|@type-tag@|$(1)|g" \
+	      -e "s|@type-default@|$(2)|g" \
+	      -e "s|@store-ref@|store-ref|g" \
+	      -e "s|@store-set@|store-set!|g" \
+	      -e "s|@type@|$(call lookup,$(1),$(TYPETAGS2TYPES))|g" \
+	      -e "s|@type-import@||g" $$^ > $$@ ;\
+	else \
+	  sed -e "s|@type-tag@|$(1)|g" \
+	      -e "s|@type-default@|$(2)|g" \
+	      -e "s|@store-ref@|$(1)vector-ref|g" \
+	      -e "s|@store-set@|$(1)vector-set!|g" \
+	      -e "s|@type@|$(call lookup,$(1),$(TYPETAGS2TYPES))|g" \
+	      -e "s|@type-import@|srfi25/array|g" $$^ > $$@ ;\
+	fi
+
+endef
+
+define generateArraySch =
+$(GENSCMDIR)/$(1)array.sch: src/Llib/array.sch.in
+	@sed -e "s|@type-tag@|$(1)|g" \
+        -e "s|@type-default@|$(2)|g" \
+        $$^ > $$@                               
+
+endef
+
+
+define left =
+$(strip $(subst dummy,,$(word 1,$(subst _,$(space),$1))))
+endef
+
+define right =
+$(strip $(word 2,$(subst _,$(space),$1)))
+endef
+
+define lookup =
+$(if $(1),$(call right, $(filter $(1)_%, $(2))),$(call right, $(filter dummy_%, $(2))))
+endef
 
 # sources
-BIGLOOSRCS = $(wildcard src/Llib/*.scm)
+TYPETAGS2TYPES = dummy_obj s8_int8 u8_uint8 s16_int16 u16_uint16 s32_int32 u32_uint32 s64_int64 u64_uint64 f32_float f64_double
+TYPETAGS2DEFAULTS = dummy_$(pound)unspecified s8_$(pound)s8$(colon)0  u8_$(pound)u8$(colon)0 s16_$(pound)s16$(colon)0  u16_$(pound)u16$(colon)0 s32_$(pound)s32$(colon)0 u32_$(pound)u32$(colon)0 s64_$(pound)s64$(colon)0 u64_$(pound)u64$(colon)0 f32_0.0 f64_0.0
+
+GENERATEDINCLUDES = $(foreach tag, $(TYPETAGS2DEFAULTS), $(GENSCMDIR)/$(call left, $(tag))array.sch)
+GENERATEDSRCS =  $(foreach tag, $(TYPETAGS2DEFAULTS), $(GENSCMDIR)/$(call left, $(tag))array.scm)	
+BIGLOOSRCS = $(wildcard src/Llib/*.scm) $(GENERATEDSRCS)
 TESTSRCS = $(wildcard recette/*.scm)
 HEAPSRC = src/Misc/make_lib.scm
 DOCSRCS = $(wildcard manual/*.texi)
@@ -94,11 +146,28 @@ $(OBJDIR)/%_p.o:src/Llib/%.scm
 $(OBJDIR)/%_u.o:src/Llib/%.scm
 	$(BIGLOO)  -c $(BUNSAFEFLAGS) -o $@ $^
 
+$(OBJDIR)/%_s.o:$(GENSCMDIR)/%.scm
+	$(BIGLOO)  -c $(BSAFEFLAGS) -o $@ $^
+
+$(OBJDIR)/%_p.o:$(GENSCMDIR)/%.scm
+	$(BIGLOO)  -c $(BPROFILEFLAGS) -o $@ $^
+
+$(OBJDIR)/%_u.o:$(GENSCMDIR)/%.scm
+	$(BIGLOO)  -c $(BUNSAFEFLAGS) -o $@ $^
+
+
 $(SCLASSDIR)/%.class:src/Llib/%.scm
 	$(BIGLOO) -jvm  -c $(BSAFEFLAGS) -o $@ $^
 
 $(UCLASSDIR)/%.class:src/Llib/%.scm
 	$(BIGLOO) -jvm  -c $(BUNSAFEFLAGS) -o $@ $^
+
+$(SCLASSDIR)/%.class:$(GENSCMDIR)/%.scm
+	$(BIGLOO) -jvm  -c $(BSAFEFLAGS) -o $@ $^
+
+$(UCLASSDIR)/%.class:$(GENSCMDIR)/%.scm
+	$(BIGLOO) -jvm  -c $(BUNSAFEFLAGS) -o $@ $^
+
 
 recette/%.o:recette/%.scm heap
 	$(BIGLOO)  -c $(BSAFEFLAGS) -L $(DISTDIR) -o $@ $<
@@ -109,11 +178,16 @@ recette/%.class:recette/%.scm heap
 
 #targets
 
-c: .afile .etags lib 
+c: $(DISTDIR) $(GENSCMDIR) .afile .etags lib 
 
-jvm: .jfile .afile .etags libj
+jvm: $(DISTDIR) $(GENSCMDIR) .jfile .afile .etags libj
 
 all: c jvm
+
+$(foreach tagdefault,$(TYPETAGS2DEFAULTS),$(eval $(call generateArrayScm,$(call left, $(tagdefault)),$(call right, $(tagdefault)))))
+
+$(foreach tagdefault,$(TYPETAGS2DEFAULTS),$(eval $(call generateArraySch,$(call left, $(tagdefault)),$(call right, $(tagdefault)))))
+
 
 test: c recette/test$(LIBNAME) 
 	./recette/test$(LIBNAME)
@@ -135,7 +209,7 @@ manual-pdf : $(DOCSRCS)
 	$(BGLAFILE) -o $@  $^
 
 .jfile: $(BIGLOOSRCS)
-	$(BGLJFILE) -pbase bigloo.$(LIBNAME) -o $@  -I recette -I src/Misc -I src/Llib $(_SRCSWOUTDIR)
+	$(BGLJFILE) -pbase bigloo.$(LIBNAME) -o $@  -I recette -I src/Misc -I src/Llib -I $(GENSCMDIR) $(_SRCSWOUTDIR)
 
 .recettejfile: $(TESTSRCS)
 	$(BGLJFILE) -pbase recette -o $@  -I recette  $(_TESTSRCSWOUTDIR)
@@ -166,6 +240,8 @@ $(OBJDIR)/make_lib_u.o:src/Misc/make_lib.scm
 $(EUCLASSDIR)/make_lib.class:src/Misc/make_lib.scm
 	$(BIGLOO) -jvm -c $(BUNSAFEFLAGS) -o $@ $^
 
+
+
 lib: init heap $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).so  \
 	       $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).a   \
                $(DISTDIR)/lib$(LIBNAME)_p-$(VERSION).so  \
@@ -177,10 +253,10 @@ lib: init heap $(DISTDIR)/lib$(LIBNAME)_s-$(VERSION).so  \
 
 libj: init jheap heap jar_s jar_u jar_es jar_eu
 
-init: $(DISTDIR)/$(LIBNAME).init
+init: $(DISTDIR)/$(LIBNAME).init 
 
-$(DISTDIR)/$(LIBNAME).init : $(DISTDIR)  $(wildcard src/Llib/*.sch) src/Misc/$(LIBNAME).init.in
-	cat $(wildcard src/Llib/*.sch) src/Misc/$(LIBNAME).init.in > $@
+$(DISTDIR)/$(LIBNAME).init : $(GENERATEDINCLUDES) $(wildcard src/Llib/*.sch) src/Misc/$(LIBNAME).init.in
+	cat $^ > $@
 
 jar_s: $(SCLASSDIR)  $(DISTDIR) $(SAFECLASSES)
 	$(JAR) -cf $(DISTDIR)/$(LIBNAME)_s-$(VERSION).zip -C $(SCLASSDIR)/../../ .
@@ -250,6 +326,9 @@ $(ESCLASSDIR):
 $(EUCLASSDIR):
 	mkdir -p $@
 
+$(GENSCMDIR):
+	mkdir -p $@
+
 
 check-syntax: .afile
 	$(BIGLOO) $(BCOMMONFLAGS) -afile .afile -syntax-check ${CHK_SOURCES}
@@ -261,6 +340,7 @@ install: c jvm
 	done; \
 
 clean:
+	rm -f -r $(GENSCMDIR);\
 	rm -f $(TESTOBJECTS);\
 	rm -f $(TESTCLASSES);\
 	rm -f -r $(OBJDIR);\

@@ -1,6 +1,7 @@
 (module srfi25/shape
-   (include "array.sch")
-   (import srfi25/array
+   (import srfi25/store
+           srfi25/array
+           srfi25/array-base
            srfi25/apply)
    (export
       (class %shape
@@ -16,10 +17,13 @@
       (inline shape-bounded? shape::%shape dim::long v::long)
       (inline shape->list shape::%shape)
       (shape->array shp::%shape)
-      (shape-for-each shp::%shape proc::procedure . o)
       (inline shape-translation-vector shp::%shape)
       (inline shape-coefficient-vector shp::%shape)
-      (inline shape->startv/endv shp::%shape)))
+      (inline shape->startv/endv shp::%shape)
+      (inline shape-for-each shp::%shape proc::procedure . o)
+      (inline shape-for-each/arguments shp::%shape proc::procedure)
+      (inline shape-for-each/vector shp::%shape proc::procedure vec::vector)
+      (inline shape-for-each/array shp::%shape proc::procedure arr::%array-base)))
 
 
 (define-method (object-hashnumber obj::%shape)
@@ -132,14 +136,14 @@
 
 
 ;;;; shape-for-each from arlib provided with srfi25
-(define (shape-for-each shp::%shape proc::procedure . o)
+(define-inline (shape-for-each shp::%shape proc::procedure . o)
   (if (null? o)
       (shape-for-each/arguments shp proc)
       (if (vector? (car o))
           (shape-for-each/vector shp proc (car o))
           (shape-for-each/array shp proc (car o)))))
 
-(define (shape-for-each/arguments shp::%shape proc::procedure)
+(define-inline (shape-for-each/arguments shp::%shape proc::procedure)
    (let ((r (shape-rank shp)))
       (let ((vec (make-vector r)))
          (let do-dim ((d 0))
@@ -151,7 +155,7 @@
                        (vector-set! vec d k)
                        (do-dim (+ d 1)))))))))
 
-(define (shape-for-each/vector shp::%shape proc::procedure vec::vector)
+(define-inline (shape-for-each/vector shp::%shape proc::procedure vec::vector)
   (let ((r (shape-rank shp)))
     (let do-dim ((d 0))
       (if (= d r)
@@ -162,7 +166,7 @@
               (vector-set! vec d k)
               (do-dim (+ d 1))))))))
 
-(define (shape-for-each/array shp::%shape proc::procedure arr::%array-base)
+(define-inline (shape-for-each/array shp::%shape proc::procedure arr::%array-base)
   ;; arr is not vector
   (let ((r (shape-rank shp)))
     (let do-dim ((d 0))
@@ -171,7 +175,7 @@
           (let ((e (shape-end shp d)))
             (do ((k (shape-start shp d) (+ k 1)))
               ((= k e))
-              (array-set! arr d k)
+              (array-set1! arr d k)
               (do-dim (+ d 1))))))))
 
 (define-method (object-equal? shap1::%shape obj)
@@ -180,5 +184,23 @@
        (let ((shap2::%shape obj))
           (equal? (-> shap1 vec)
              (-> shap2 vec)))))
+
+(define-method (object-equal? arr1::%array-base obj)
+   (if (not (array? obj))
+       #f
+       (let ((arr2::%array-base obj))
+          (and (equal?  (array-shape arr1) (array-shape arr2))
+               (let* ((r (array-rank arr1))
+                      (ks (make-vector r)))
+                  (let loop ((d 0))
+                     (if (<fx d r)
+                         (let ((e (array-end arr1 d)))
+                            (do ((k (array-start arr1 d) (+fx k 1))
+                                 (true #t (and true (loop (+fx d 1)))))
+                                ((=fx k e) true)
+                                (vector-set! ks d k)))
+                         (let ((res (equal? (array-ref-w/vector arr1 ks)
+                                       (array-ref-w/vector arr2 ks))))
+                            res))))))))
 
 
