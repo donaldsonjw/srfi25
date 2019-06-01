@@ -1,0 +1,40 @@
+* SRFI 25: Multi-dimensional Array Primitives 
+
+** Description
+   The srfi25 library is an implentation of [[https://srfi.schemers.org/srfi-25/srfi-25.html][SRFI 25]] for Bigloo. It
+   implements all of the defined functions and macros as well as a few
+   extensions, most notably the inclusion of homogenous arrays
+   supporting the types defined by [[https://srfi.schemers.org/srfi-4/srfi-4.html][SRFI 4]].
+
+** Building
+    Both the Bigloo native and jvm backends are supported. To build the native library, execute
+    
+    ~make~
+    
+    To build the JVM library, execute
+
+    ~make jvm~
+
+    To build both, execute
+ 
+    ~make all~
+
+** Installation
+   To install the library, execute 
+
+   ~make install~
+
+   This by default installs the library into /usr/lib/bigloo. If you have Bigloo installed to a different prefix, execute 
+   
+   ~make install DESTDIR=/path/prefix~
+
+   This will result in the library being installed /path/prefix/lib/bigloo.
+
+** Tests
+   To run the tests, you will need to install [[https://github.com/donaldsonjw/btest][btest]]. Once this is done, the native tests can be executed with 
+   
+   ~make test~
+
+   and the jvm tests can be executed with 
+
+   ~make jtest~
