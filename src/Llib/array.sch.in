@@ -1,0 +1,30 @@
+(define-expander @type-tag@array-ref
+   (lambda (x e)
+      (match-case x
+         ((?- ?array)
+          `(@type-tag@array-ref0 ,@(e `(,array) e)))
+         ((?- ?array ?i1)
+          (e `(@type-tag@array-ref1 ,array ,i1) e))
+         ((?- ?array ?i1 ?i2)
+          (e `(@type-tag@array-ref2 ,array ,i1 ,i2) e))
+         ((?- ?array ?i1 ?i2  ?i3 .  ?rest)
+          `(@type-tag@array-ref* ,@(e `(,array ,i1 ,i2 ,i3 . ,rest) e)))
+         (else
+          (error "@type-tag@array-ref" "unrecognized @type-tag@array-ref call"  x))
+         )))
+
+
+(define-expander @type-tag@array-set!
+   (lambda (x e)
+      (match-case x
+         ((?- ?array ?v)
+          `(@type-tag@array-set0! ,@(e `(,array ,v) e)))
+         ((?- ?array ?i1 ?v)
+          (e `(@type-tag@array-set1! ,array ,i1 ,v) e))
+         ((?- ?array ?i1 ?i2 ?v)
+          (e `(@type-tag@array-set2! ,array ,i1 ,i2 ,v) e))
+         ((?- ?array ?i1 ?i2  ?iv1 ?iv2 .  ?rest)
+          `(@type-tag@array-set*! ,@(e `(,array ,i1 ,i2 ,iv1 ,iv2 . ,rest) e)))
+         (else
+          (error "@type-tag@array-set!" "unrecognized @type-tag@array-set! call"  x))
+         )))

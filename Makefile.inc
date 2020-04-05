@@ -3,17 +3,17 @@ BIGLOO = bigloo
 BGLAFILE = bglafile
 BGLJFILE = bgljfile
 BGLTAGS = bgltags
-LD = gcc --shared -flto
+LD = gcc --shared
 AR = ar
 JAR = jar
 RANLIB = ranlib
 INSTALL = install
 LINK = ln
 MAKEINFO = makeinfo
-space:=
-space+=
+space:=$(shell echo " ")
 colon:=:
-pound:=\#
+epound:=\#
+pound:=$(shell echo '$(epound)')
 
 BIGLOO_VERSION := $(shell $(BIGLOO) -eval "(print *bigloo-version*) (exit 0)" -q)
 BIGLOOLIBDIR := $(shell $(BIGLOO) -eval "(print *default-lib-dir*) (exit 0)" -q)
@@ -75,8 +75,8 @@ endef
 define generateArraySch =
 $(GENSCMDIR)/$(1)array.sch: src/Llib/array.sch.in
 	@sed -e "s|@type-tag@|$(1)|g" \
-        -e "s|@type-default@|$(2)|g" \
-        $$^ > $$@                               
+	-e "s|@type-default@|$(2)|g" \
+	$$^ > $$@
 
 endef
 
@@ -182,6 +182,7 @@ c: $(DISTDIR) $(GENSCMDIR) .afile .etags lib
 
 jvm: $(DISTDIR) $(GENSCMDIR) .jfile .afile .etags libj
 
+.PHONY: all 
 all: c jvm
 
 $(foreach tagdefault,$(TYPETAGS2DEFAULTS),$(eval $(call generateArrayScm,$(call left, $(tagdefault)),$(call right, $(tagdefault)))))
