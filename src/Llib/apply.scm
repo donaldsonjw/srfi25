@@ -1,4 +1,5 @@
 (module srfi25/apply
+   (include "vector-utils.sch")
    (import
       srfi25/store
       srfi25/shape
@@ -28,7 +29,7 @@
          (else
           (error "vector/rank-1-array->list" "unsupported type" x))))
 
-(define (apply-to-vector proc::procedure vec::vector )
+(define (apply-to-vector proc::procedure vec::vector)
    (let ((len (vector-length vec)))
       (case len
          ((0)

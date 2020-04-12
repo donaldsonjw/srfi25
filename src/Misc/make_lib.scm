@@ -1,4 +1,5 @@
 (module srfi25_make_lib
+   (include "../Llib/vector-utils.sch")
    (import srfi25/store
            srfi25/shape
            srfi25/apply

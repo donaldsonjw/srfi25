@@ -1,4 +1,5 @@
 (module srfi25/shape
+   (include "vector-utils.sch")
    (import srfi25/store
            srfi25/array
            srfi25/array-base

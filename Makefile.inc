@@ -57,6 +57,7 @@ $(GENSCMDIR)/$(1)array.scm: src/Llib/array.scm.in $(GENSCMDIR)/$(1)array.sch
 	@if [ "$(1) " = " " ]; then \
 	  sed -e "s|@type-tag@|$(1)|g" \
 	      -e "s|@type-default@|$(2)|g" \
+	      -e "s|@store-length@|store-length|g" \
 	      -e "s|@store-ref@|store-ref|g" \
 	      -e "s|@store-set@|store-set!|g" \
 	      -e "s|@type@|$(call lookup,$(1),$(TYPETAGS2TYPES))|g" \
@@ -64,6 +65,7 @@ $(GENSCMDIR)/$(1)array.scm: src/Llib/array.scm.in $(GENSCMDIR)/$(1)array.sch
 	else \
 	  sed -e "s|@type-tag@|$(1)|g" \
 	      -e "s|@type-default@|$(2)|g" \
+	      -e "s|@store-length@|$(1)vector-length|g" \
 	      -e "s|@store-ref@|$(1)vector-ref|g" \
 	      -e "s|@store-set@|$(1)vector-set!|g" \
 	      -e "s|@type@|$(call lookup,$(1),$(TYPETAGS2TYPES))|g" \

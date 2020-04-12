@@ -18,14 +18,14 @@
       (inline @type-tag@array-start array::%array-base k::long)
       (inline @type-tag@array-end array::%array-base k::long)
       (inline @type-tag@array-shape array::%array-base)
-      (inline @type-tag@array-ref*::@type@ array::%array-base #!rest indices)
-      (inline @type-tag@array-set*! array::%array-base #!rest indices+val)
-      (inline @type-tag@array-ref2::@type@ array::%array-base i1::long i2::long)
-      (inline @type-tag@array-set2! array::%array-base i1::long i2::long val::@type@)
+      (@type-tag@array-ref*::@type@ array::%array-base #!rest indices)
+      (@type-tag@array-set*! array::%array-base #!rest indices+val)
+      (@type-tag@array-ref2::@type@ array::%array-base i1::long i2::long)
+      (@type-tag@array-set2! array::%array-base i1::long i2::long val::@type@)
       (@type-tag@array-ref1::@type@ array::%array-base i1)
       (@type-tag@array-set1! array::%array-base i1 val::@type@)
-      (inline @type-tag@array-set0! array::%array-base val::@type@)
-      (inline @type-tag@array-ref0::@type@ array::%array-base)
+      (@type-tag@array-set0! array::%array-base val::@type@)
+      (@type-tag@array-ref0::@type@ array::%array-base)
       (inline rank-1-@type-tag@array? x)
       (@type-tag@array-tabulate shp::%shape proc::procedure)
       (@type-tag@array-tabulate! shp::%shape proc::procedure ind)
@@ -40,12 +40,14 @@
       (@type-tag@array-set-w/array! array::%array-base indices::%array-base val::@type@)
       (@type-tag@array-ref-w/vector::@type@ array::%array-base indices::vector)
       (@type-tag@array-ref-w/array::@type@ array::%array-base indices::%array-base)
+      (shared-@type-tag@array-set-w/vector! array::%shared-array indices::vector val)
       (@type-tag@array-transpose array::%array)
-      (inline @type-tag@array-for-each-index arr::%array-base proc::procedure #!optional o)
+      (@type-tag@array-for-each-index arr::%array-base proc::procedure #!optional (o::%array-base (class-nil %array-base)))
       (@type-tag@array-for-each-index/arguments arr::%array-base proc::procedure)
       (@type-tag@array-for-each-index/vector arr::%array-base proc::procedure ind::vector)
       (@type-tag@array-for-each-index/array arr::%array-base proc::procedure ind::%array-base)
-      (inline @type-tag@array-for-each arr::%array-base proc::procedure)))
+      (inline @type-tag@array-for-each arr::%array-base proc::procedure)
+      ))
 
 
 ;; constructors
@@ -127,7 +129,7 @@
         (=fx (@type-tag@array-rank x) 1)
         (=fx (@type-tag@array-start x 0) 0)))
 
-(define-inline (@type-tag@array-ref0 array::%array-base)
+(define (@type-tag@array-ref0 array::%array-base)
    (if (isa? array %array)
        (let ((array::%array array))
           (@store-ref@ (-> array store) 0))
@@ -201,7 +203,7 @@
                  (vector-set! t 0 i1)
                  (@type-tag@array-ref-w/vector array t))))))
 
-(define-inline (@type-tag@array-ref2 array::%array-base i1::long i2::long)
+(define (@type-tag@array-ref2 array::%array-base i1::long i2::long)
    (if (isa? array %array)
        (let* ((array::%array array)
               (lower1 (@type-tag@array-start array 0))
@@ -217,7 +219,7 @@
           (vector-set! t 1 i2)
           (@type-tag@array-ref-w/vector shared-array t))))
 
-(define-inline (@type-tag@array-ref* array::%array-base #!rest indices)
+(define (@type-tag@array-ref* array::%array-base #!rest indices)
    (let ((len (length indices)))
       (cond  ((=fx len 0)
               (@type-tag@array-ref0 array))
@@ -230,7 +232,7 @@
              (else
               (error "@type-tag@array-ref*" "invalid indices: "  indices)))))
 
-(define-inline (@type-tag@array-set0! array::%array-base val)
+(define (@type-tag@array-set0! array::%array-base val)
    (if (isa? array %array)
        (let ((array::%array array))
           (@store-set@ (-> array store) 0 val))
@@ -250,7 +252,7 @@
               (@store-set@ (-> array store) index val))
            (shared-@type-tag@array-set-w/vector! array indices val))))
 
-(define-inline (shared-@type-tag@array-set-w/vector! array::%shared-array indices::vector val)
+(define (shared-@type-tag@array-set-w/vector! array::%shared-array indices::vector val)
    (let* ((backing::%array-base (-> array backing)))
       (let ((t::vector (-> array sscratch)))
          (do ((i 0 (+fx i 1)))
@@ -290,23 +292,50 @@
                                       (vector* (vector-ref (-> shared-array coeffs) i)
                                          t)))))))))
 
+
 (define (@type-tag@array-set1! array::%array-base i1 val)
+   (define (@type-tag@array-set1-array! array::%array-base i1::%array-base val)
+      (@type-tag@array-set-w/array! array i1 val))
+   
+   (define (@type-tag@array-set1-vector! array::%array-base i1::vector val)
+      (@type-tag@array-set-w/vector! array i1 val))
+   
+   (define (@type-tag@array-set1-long! array::%array i1::long val)
+      (let* ((lower (array-start array 0)))
+         (@store-set@ (-> array store)
+            (-fx i1 lower) val)))
+   
+   (define (shared-@type-tag@array-set1-long! array::%shared-array i1::long val)
+      (let ((t (make-vector (array-rank array))))
+         (vector-set! t 0 i1)
+         (@type-tag@array-set-w/vector! array t val)))
+   
    (cond ((rank-1-@type-tag@array? i1)
-          (@type-tag@array-set-w/array! array i1 val))
+          (@type-tag@array-set1-array! array i1 val))
          ((vector? i1)
-          (@type-tag@array-set-w/vector! array i1 val))
+          (@type-tag@array-set1-vector! array i1 val))
          (else
           (if (isa? array %array)
-              (let* ((array::%array array)
-                     (lower (@type-tag@array-start array 0)))
-                 (@store-set@ (-> array store)
-                    (-fx i1 lower) val))
-              (let ((array::%shared-array array))
-                 (let ((t (make-vector (@type-tag@array-rank array))))
-                    (vector-set! t 0 i1)
-                    (@type-tag@array-set-w/vector! array t val)))))))
+              (@type-tag@array-set1-long! array i1 val)
+              (shared-@type-tag@array-set1-long! array i1 val)))))
 
-(define-inline (@type-tag@array-set2! array::%array-base i1::long i2::long val)
+; (define (@type-tag@array-set1! array::%array-base i1 val)
+;    (cond ((rank-1-@type-tag@array? i1)
+;           (@type-tag@array-set-w/array! array i1 val))
+;          ((vector? i1)
+;           (@type-tag@array-set-w/vector! array i1 val))
+;          (else
+;           (if (isa? array %array)
+;               (let* ((array::%array array)
+;                      (lower (@type-tag@array-start array 0)))
+;                  (@store-set@ (-> array store)
+;                     (-fx i1 lower) val))
+;               (let ((array::%shared-array array))
+;                  (let ((t (make-vector (@type-tag@array-rank array))))
+;                     (vector-set! t 0 i1)
+;                     (@type-tag@array-set-w/vector! array t val)))))))
+
+(define (@type-tag@array-set2! array::%array-base i1::long i2::long val)
    (if (isa? array %array)
        (let* ((array::%array array)
               (lower1 (@type-tag@array-start array 0))
@@ -322,7 +351,7 @@
              (vector-set! t 1 i2)
              (@type-tag@array-set-w/vector! array t val)))))
 
-(define-inline (@type-tag@array-set*! array::%array-base #!rest indices+val)
+(define (@type-tag@array-set*! array::%array-base #!rest indices+val)
    (let ((len (length indices+val)))
       (cond ((=fx len 1)
              (@type-tag@array-set0! array (car indices+val)))
@@ -337,21 +366,6 @@
                 (list-ref indices+val (-fx len 1))))
             (else
              (error "@type-tag@array-set*!" "invalid arguments" indices+val)))))
-
-; (define (vector-for-each proc::procedure vec::vector #!rest vecs)
-;    (if (null? vecs)
-;        (do ((i 0 (+fx i 1)))
-;            ((=fx i (vector-length vec)) #unspecified)
-;            (proc (vector-ref vec i)))
-;        (if (every (lambda (v) (=fx (vector-length v) (vector-length vec))) vecs)
-;            (do ((i 0 (+fx i 1)))
-;                ((=fx i (vector-length vec)) #unspecified)
-;                (apply proc (cons (vector-ref vec i)
-;                               (map (lambda (v) (vector-ref v i)) vecs))))
-           
-;            (error "vector-for-each" "all vector arguments must be the same length"
-;               (cons vec vecs)))))
-
 
 (define (affine-proc->coeffs proc rank)
    (receive* Cs (apply proc (make-list rank 0))
@@ -379,13 +393,12 @@
                                      (backing array)))))
 
 ;;; array-for-each-index from arlib provided with srfi25 
-(define-inline (@type-tag@array-for-each-index arr::%array-base proc::procedure #!optional o)
-   (let ((flag::bool o))
-    (if (not flag)
-        (@type-tag@array-for-each-index/arguments arr proc)
-        (if (vector? o)
-            (@type-tag@array-for-each-index/vector arr proc o)
-            (@type-tag@array-for-each-index/array arr proc o)))))
+(define (@type-tag@array-for-each-index arr::%array-base proc::procedure #!optional (o::%array-base (class-nil %array-base)))
+   (if (eq? o (class-nil %array-base))
+       (@type-tag@array-for-each-index/arguments arr proc)
+       (if (vector? o)
+           (@type-tag@array-for-each-index/vector arr proc o)
+           (@type-tag@array-for-each-index/array arr proc o))))
 
 (define (@type-tag@array-for-each-index/arguments arr::%array-base proc::procedure)
    (let ((r::long (@type-tag@array-rank arr)))
@@ -475,7 +488,7 @@
        (let* ((arr::%array arr))
           (do ((i::long 0 (+fx i 1)))
               ((=fx i (store-length (-> arr store))))
-              (proc (store-ref (-> arr store) i))))
+              (proc (@store-ref@ (-> arr store) i))))
        (let ((t (-> arr scratch)))
           (@type-tag@array-for-each-index/vector arr
              (lambda (v) (proc (@type-tag@array-ref-w/vector arr v)))
