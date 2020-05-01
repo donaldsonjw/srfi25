@@ -20,11 +20,11 @@
       (shape->array shp::%shape)
       (inline shape-translation-vector shp::%shape)
       (inline shape-coefficient-vector shp::%shape)
-      (inline shape->startv/endv shp::%shape)
       (inline shape-for-each shp::%shape proc::procedure . o)
       (inline shape-for-each/arguments shp::%shape proc::procedure)
       (inline shape-for-each/vector shp::%shape proc::procedure vec::vector)
-      (inline shape-for-each/array shp::%shape proc::procedure arr::%array-base)))
+      (inline shape-for-each/array shp::%shape proc::procedure arr::%array-base)
+      (inline shape->startv+endv+lengthv shp::%shape)))
 
 
 (define-method (object-hashnumber obj::%shape)
@@ -108,14 +108,17 @@
                                 (vector-length (-> shape vec))))))
 
 
-(define-inline (shape->startv/endv shp::%shape)
+(define-inline (shape->startv+endv+lengthv shp::%shape)
    (let* ((rank (shape-rank shp))
           (startv (make-vector rank))
-          (endv (make-vector rank)))
+          (endv (make-vector rank))
+          (lengthv (make-vector rank)))
       (do ((i 0 (+fx i 1)))
-          ((= i rank) (values startv endv))
+          ((= i rank) (values startv endv lengthv))
           (vector-set! startv i (shape-start shp i))
-          (vector-set! endv i (shape-end shp i)))))
+          (vector-set! endv i (shape-end shp i))
+          (vector-set! lengthv i (-fx (shape-end shp i)
+                                    (shape-start shp i))))))
 
 (define-inline (shape-translation-vector shp::%shape)
    (let ((res (make-vector (shape-rank shp))))

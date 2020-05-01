@@ -1,6 +1,8 @@
 (module srfi25/array-base
    (export      
       (abstract-class %array-base
+         shared::bool
+         lengthv::vector
          startv::vector
          endv::vector
          scratch::vector)

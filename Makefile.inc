@@ -25,13 +25,13 @@ INSTLIBDIR = $(DESTDIR)/lib
 INSTBIGLOOLIBDIR = $(INSTLIBDIR)/bigloo/$(BIGLOO_VERSION)
 
 #C Flags
-CCOMMONFLAGS = -fPIC
+CCOMMONFLAGS = -fPIC -ggdb -g3 
 
 #Bigloo Flags
 BHEAPFLAGS = -I src/Llib -I $(GENSCMDIR) -unsafe -q -mkaddheap -mkaddlib \
 	     -heap-library $(LIBNAME)
 
-BCOMMONFLAGS = -fisa -mkaddlib -fsharing -q \
+BCOMMONFLAGS = -rm -glines -fisa -mkaddlib -fsharing -q \
                -copt '$(CCOMMONFLAGS)' -I src/Llib -I $(GENSCMDIR)
 
 BSAFEFLAGS = $(BCOMMONFLAGS) -O6 

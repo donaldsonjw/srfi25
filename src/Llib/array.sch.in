@@ -8,7 +8,7 @@
          ((?- ?array ?i1 ?i2)
           (e `(@type-tag@array-ref2 ,array ,i1 ,i2) e))
          ((?- ?array ?i1 ?i2  ?i3 .  ?rest)
-          `(@type-tag@array-ref* ,@(e `(,array ,i1 ,i2 ,i3 . ,rest) e)))
+          `(@type-tag@array-ref ,@(e `(,array ,i1 ,i2 ,i3 . ,rest) e)))
          (else
           (error "@type-tag@array-ref" "unrecognized @type-tag@array-ref call"  x))
          )))
@@ -24,7 +24,7 @@
          ((?- ?array ?i1 ?i2 ?v)
           (e `(@type-tag@array-set2! ,array ,i1 ,i2 ,v) e))
          ((?- ?array ?i1 ?i2  ?iv1 ?iv2 .  ?rest)
-          `(@type-tag@array-set*! ,@(e `(,array ,i1 ,i2 ,iv1 ,iv2 . ,rest) e)))
+          `(@type-tag@array-set! ,@(e `(,array ,i1 ,i2 ,iv1 ,iv2 . ,rest) e)))
          (else
           (error "@type-tag@array-set!" "unrecognized @type-tag@array-set! call"  x))
          )))
